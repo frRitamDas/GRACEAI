@@ -40,7 +40,8 @@ export function EffortSlider({ value, onChange, onCommit }: Props) {
       const rect = trackRef.current?.getBoundingClientRect();
       if (!rect || rect.width === 0) return 0;
       // The thumb has real width, so map its usable travel, not the raw box.
-      const inset = 28;
+      // 24px = 4px track inset + half of the 40px thumb.
+      const inset = 24;
       const usable = Math.max(1, rect.width - inset * 2);
       return Math.min(1, Math.max(0, (clientX - rect.left - inset) / usable));
     },
@@ -156,19 +157,19 @@ export function EffortSlider({ value, onChange, onCommit }: Props) {
           onChange(snap(next));
           trackRef.current?.focus({ preventScroll: true });
         }}
-        className="group relative h-[44px] w-full cursor-grab touch-none rounded-full border border-hairline bg-surface active:cursor-grabbing"
+        className="group relative h-[48px] w-full cursor-grab touch-none rounded-full border border-hairline bg-surface active:cursor-grabbing"
       >
         {/* accent fill — same position as the thumb, so they can never disagree */}
         <div
           className="pointer-events-none absolute inset-y-0 left-0 rounded-full bg-accent"
           style={{
-            width: `calc(28px + (100% - 56px) * ${position})`,
+            width: `calc(24px + (100% - 48px) * ${position})`,
             transition: dragging ? "none" : "width var(--dur-base) var(--ease-out)",
             willChange: "width",
           }}
         />
         {/* stop ticks: quiet until reached, then they read as progress */}
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-between px-[32px]" aria-hidden="true">
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-between px-[26px]" aria-hidden="true">
           {EFFORT_LEVELS.map((level, index) => (
             <span
               key={level.id}
@@ -186,15 +187,15 @@ export function EffortSlider({ value, onChange, onCommit }: Props) {
         </div>
         {/* thumb */}
         <span
-          className="pointer-events-none absolute top-1/2 grid h-[56px] w-[56px] -translate-y-1/2 place-items-center rounded-full bg-white ring-[5px] ring-accent"
+          className="pointer-events-none absolute top-1/2 grid h-[40px] w-[40px] -translate-y-1/2 place-items-center rounded-full bg-white"
           style={{
-            left: `calc(${position} * (100% - 56px))`,
+            left: `calc(4px + ${position} * (100% - 48px))`,
             transition: dragging
               ? "none"
               : `left var(--dur-slow) var(--ease-spring), box-shadow var(--dur-fast) ease`,
             willChange: "left",
             boxShadow: dragging
-              ? "0 0 0 10px rgba(59,130,246,0.18)"
+              ? "0 0 0 6px rgba(59,130,246,0.20)"
               : "0 0 0 0 rgba(59,130,246,0)",
           }}
           aria-hidden="true"

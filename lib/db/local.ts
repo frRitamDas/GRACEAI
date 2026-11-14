@@ -81,6 +81,20 @@ export type LocalDb = {
   messages: LocalMessage[];
   files: LocalFile[];
   usage: LocalUsage[];
+  modelOverrides: {
+    id: string;
+    hidden: boolean;
+    name: string | null;
+    tier: number | null;
+    credits: number | null;
+    blurb: string | null;
+    custom: boolean;
+    provider: string | null;
+    upstream: string | null;
+    context_label: string | null;
+    free: boolean;
+    updated_at: string;
+  }[];
   providerKeys: {
     provider: string;
     api_key: string;
@@ -99,6 +113,7 @@ const EMPTY: LocalDb = {
   files: [],
   usage: [],
   providerKeys: [],
+  modelOverrides: [],
 };
 
 const LOCAL_DIR = path.join(process.cwd(), ".data");

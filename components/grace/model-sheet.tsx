@@ -26,6 +26,8 @@ type Props = {
   selected: string | null;
   onSelect: (id: string) => void;
   anyConfigured: boolean;
+  /** The owner sees console instructions; everyone else sees a status line. */
+  isAdmin: boolean;
 };
 
 type Scope = "free" | "all" | ProviderId;
@@ -41,7 +43,7 @@ const TIER_WORD = ["", "Small", "Medium", "Large", "Large", "Frontier"];
  * Grouping only appears when the user is browsing everything — a chipped filter
  * list plus headings for three providers is two navigation systems at once.
  */
-export function ModelSheet({ open, onClose, models, selected, onSelect, anyConfigured }: Props) {
+export function ModelSheet({ open, onClose, models, selected, onSelect, anyConfigured, isAdmin }: Props) {
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<Scope>("free");
 
@@ -129,7 +131,7 @@ export function ModelSheet({ open, onClose, models, selected, onSelect, anyConfi
             />
           </div>
 
-          <div className="no-scrollbar mt-3 flex gap-1.5 overflow-x-auto pb-0.5" role="tablist" aria-label="Filter models">
+          <div className="mt-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Filter models">
             {chips.map((chip) => {
               const active = scope === chip.id;
               return (
@@ -139,7 +141,7 @@ export function ModelSheet({ open, onClose, models, selected, onSelect, anyConfi
                   role="tab"
                   aria-selected={active}
                   onClick={() => setScope(chip.id)}
-                  className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-colors duration-150 ${
+                  className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-colors duration-150 ${
                     active ? "bg-ink text-black" : "bg-control text-sub hover:text-ink"
                   }`}
                 >
@@ -157,13 +159,15 @@ export function ModelSheet({ open, onClose, models, selected, onSelect, anyConfi
         {!anyConfigured && (
           <p className="mx-5 mt-3 flex items-start gap-2 rounded-[14px] border border-hairline bg-control px-3.5 py-2.5 text-[13px] leading-5 text-sub">
             <Zap size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
-            No provider key yet. Add one in Settings and every model here unlocks.
+            {isAdmin
+              ? "No provider is connected yet. Add a key in the admin console and every model here unlocks."
+              : "No provider is connected yet. The owner needs to enable one before models can answer."}
           </p>
         )}
 
         <p className="px-5 pt-3 text-[12.5px] leading-4 text-muted">
           {scope === "free"
-            ? "Free models cost no money on your provider key. Grace still tracks usage."
+            ? "Free models cost no money to run. Grace still tracks usage against your credits."
             : `Free models are marked Free. ${counts.free} of ${counts.all} cost nothing.`}
         </p>
 
@@ -203,14 +207,16 @@ export function ModelSheet({ open, onClose, models, selected, onSelect, anyConfi
 
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline gap-2">
-                        <span className={`truncate text-[14.5px] leading-5 ${active ? "font-semibold text-ink" : "font-medium text-ink"}`}>
+                        {/* Wrap rather than cut: provider names can run long and
+                            a clipped model name is worse than two lines. */}
+                        <span className={`line-clamp-2 text-[14.5px] leading-5 ${active ? "font-semibold text-ink" : "font-medium text-ink"}`}>
                           {model.name}
                         </span>
                         {model.free && (
                           <span className="shrink-0 text-[11px] font-semibold text-accent-text">Free</span>
                         )}
                       </span>
-                      <span className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] leading-4 text-muted">
+                      <span className="mt-0.5 flex items-center gap-1.5 text-[12px] leading-4 text-muted">
                         <span>{model.providerLabel}</span>
                         <span aria-hidden="true">·</span>
                         <span>{model.contextLabel || "Context varies"}</span>

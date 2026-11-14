@@ -31,7 +31,7 @@ export function SideRail({ user, conversations, activeId, onSelect, onNew, onDel
           <GraceMark className="h-5 w-5" />
         </span>
         <div className="min-w-0">
-          <p className="truncate text-[15px] font-semibold leading-5 text-ink">Grace 3</p>
+          <p className="truncate text-[15px] font-semibold leading-5 text-ink">Grace</p>
           <p className="flex items-center gap-1.5 text-[12px] leading-4 text-muted">
             {user?.unlimited ? (
               <span className="font-semibold text-accent-text">Owner</span>

@@ -12,6 +12,7 @@ import {
   type ProviderId,
 } from "@/lib/ai/catalog";
 import { configuredProviders, getProviderKey, keyServesModel } from "@/lib/ai/env";
+import { cachedCatalog, storeCatalog } from "@/lib/ai/catalog-cache";
 import { loadCatalog } from "@/lib/ai/discovery";
 import { streamChat, titleFrom, type ChatAttachment, type ChatTurn } from "@/lib/ai/chat";
 import {
@@ -69,7 +70,9 @@ export async function POST(request: Request) {
 
   if (ready.size === 0) {
     return jsonError(
-      "No model provider is connected yet. Add an OpenRouter, Groq or Google AI Studio key in Settings.",
+      user.isAdmin
+        ? "No provider is connected yet. Add an OpenRouter, Groq or Google AI Studio key in the admin console."
+        : "No provider is available yet. The owner needs to connect one before chats can run.",
       503,
       { code: "no_provider" }
     );
@@ -77,7 +80,11 @@ export async function POST(request: Request) {
 
   // Route against the live catalog, not the bundled one: a model discovered
   // from the provider (including free ones) must be sendable too.
-  const catalog = (await loadCatalog()).models;
+  // Reuse the shared cache when warm; discovery is three provider round-trips.
+  const cached = cachedCatalog();
+  const built = cached ?? (await loadCatalog());
+  if (!cached) storeCatalog(built);
+  const catalog = built.models;
 
   let model =
     getModel(body.model, catalog) ??
@@ -104,7 +111,9 @@ export async function POST(request: Request) {
   const key = await getProviderKey(model.provider);
   if (!key) {
     return jsonError(
-      `${PROVIDERS[model.provider].label} is not connected. Add its key in Settings.`,
+      user.isAdmin
+        ? `${PROVIDERS[model.provider].label} is not connected. Add its key in the admin console.`
+        : `${PROVIDERS[model.provider].label} is not available right now. Pick another model.`,
       503,
       { code: "no_provider" }
     );
@@ -113,7 +122,7 @@ export async function POST(request: Request) {
   // The key may be restricted to a subset of the provider's models.
   if (!(await keyServesModel(model.provider, model.id))) {
     return jsonError(
-      `${model.name} is not enabled for the ${PROVIDERS[model.provider].label} key. Enable it in Settings, or pick another model.`,
+      `${model.name} is not enabled for the shared ${PROVIDERS[model.provider].label} key, so it cannot run. Pick another model.`,
       403,
       { code: "model_not_allowed" }
     );

@@ -173,10 +173,15 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
       if ((!text && attachments.length === 0) || sending) return;
 
       if (!providerReady) {
-        setNotice({
-          text: "No model provider is connected yet. Add a key to start.",
-          action: { label: "Open settings", href: "/settings" },
-        });
+        // Same rule as the empty state: only the owner is told where a key goes.
+        setNotice(
+          user.isAdmin
+            ? {
+                text: "No provider is connected yet, so there is nothing to send to.",
+                action: { label: "Open the console", href: "/admin" },
+              }
+            : { text: "Grace is not connected yet. The owner needs to enable a provider." }
+        );
         return;
       }
 
@@ -372,6 +377,7 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
       deepResearch,
       input,
       providerReady,
+      user.isAdmin,
       refreshConversations,
       refreshUsage,
       selectedModel,
@@ -557,13 +563,22 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
           <div className="flex h-full flex-col items-center justify-center gap-1 pb-16 pt-4">
             <Greeting name={greetingName} />
             {!providerReady && (
-              <p className="mt-5 flex items-center gap-2 rounded-full border border-hairline bg-surface px-3.5 py-2 text-[13px] text-sub">
-                <Sparkles size={14} className="text-accent" aria-hidden="true" />
-                Add a provider key in{" "}
-                <Link href="/settings" className="font-bold text-accent-text hover:underline">
-                  Settings
-                </Link>{" "}
-                to chat
+              // Keys are deployment-wide, so this tells people what is missing
+              // and, only for the owner, where to fix it. A regular account is
+              // pointed at the owner rather than an input it cannot use.
+              <p className="mt-5 flex max-w-[min(100%,26rem)] flex-wrap items-center justify-center gap-x-1.5 gap-y-1 rounded-[16px] border border-hairline bg-surface px-3.5 py-2 text-center text-[13px] leading-5 text-sub">
+                <Sparkles size={14} className="shrink-0 text-accent" aria-hidden="true" />
+                {user.isAdmin ? (
+                  <>
+                    Add a provider key in{" "}
+                    <Link href="/admin" className="font-bold text-accent-text hover:underline">
+                      the admin console
+                    </Link>{" "}
+                    to start chatting
+                  </>
+                ) : (
+                  "Grace is not connected yet. The owner needs to enable a provider."
+                )}
               </p>
             )}
           </div>
@@ -703,6 +718,7 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
         selected={selectedModel}
         onSelect={pickModel}
         anyConfigured={providerReady}
+        isAdmin={user.isAdmin}
       />
 
       {/* Refresh the catalog when Settings changes a key and the tab returns. */}

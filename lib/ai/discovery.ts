@@ -2,6 +2,7 @@ import "server-only";
 
 import { MODELS, PROVIDERS, type ModelDef, type ProviderId } from "@/lib/ai/catalog";
 import { getProviderKey } from "@/lib/ai/env";
+import { applyOverrides, loadOverrides } from "@/lib/ai/overrides";
 
 /**
  * Live model discovery.
@@ -312,7 +313,10 @@ export async function loadCatalog(): Promise<CatalogResult> {
     }
   }
 
-  return { models, live: [...live.keys()] };
+  // Owner edits win over whatever the providers reported: a hidden model stays
+  // hidden across a provider refresh, and a renamed one keeps its name.
+  const overrides = await loadOverrides();
+  return { models: applyOverrides(models, overrides), live: [...live.keys()] };
 }
 
 /** The catalog for a single provider, without touching the others. */
@@ -325,5 +329,7 @@ export async function loadProviderModels(provider: ProviderId): Promise<ModelDef
       : provider === "groq"
         ? await discoverGroq(key)
         : await discoverGoogle(key);
-  return models.length ? models : MODELS.filter((m) => m.provider === provider);
+  const base = models.length ? models : MODELS.filter((m) => m.provider === provider);
+  const overrides = await loadOverrides();
+  return applyOverrides(base, overrides).filter((m) => m.provider === provider);
 }

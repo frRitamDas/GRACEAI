@@ -23,7 +23,7 @@ export function Landing({ providers }: { providers: { label: string; configured:
           <span className="grid h-11 w-11 place-items-center rounded-full border border-hairline bg-control text-[#C9C9CC]">
             <GraceMark className="h-6 w-6" />
           </span>
-          <span className="font-display text-[18px] font-semibold tracking-[-0.02em] text-ink">Grace 3</span>
+          <span className="font-display text-[18px] font-semibold tracking-[-0.02em] text-ink">Grace</span>
         </div>
         <a
           href="#start"

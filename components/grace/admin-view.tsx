@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { KeyModelsDialog } from "@/components/grace/key-models-dialog";
+import { ModelManager } from "@/components/grace/model-manager";
 import type { ProviderId } from "@/lib/ai/catalog";
 
 type AdminData = {
@@ -111,8 +112,8 @@ export function AdminView() {
           <h1 className="flex items-center gap-2 text-[24px] font-bold leading-8 text-ink">
             <ShieldCheck size={20} className="text-accent" /> Admin console
           </h1>
-          <p className="text-[14px] text-sub">
-            Provider keys, routing and storage. Owner only.
+          <p className="text-[14px] leading-5 text-sub">
+            Provider keys, the model catalog and storage. Owner only.
           </p>
         </div>
       </header>
@@ -138,19 +139,29 @@ export function AdminView() {
         <>
           <section className="rounded-[20px] border border-hairline bg-surface p-4">
             <p className="text-[13px] font-semibold tracking-[0.01em] text-muted">Storage</p>
-            <p className="mt-1 text-[16px] text-ink">
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-[16px] leading-6 text-ink">
+              {data.backend === "local" ? "This machine only" : "Supabase"}
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                  data.backend === "local" && data.ephemeral
+                    ? "bg-[#3A2A16] text-[#E0B341]"
+                    : "bg-accent-soft text-accent-text"
+                }`}
+              >
+                {data.backend === "local" ? (data.ephemeral ? "Temporary" : "Local") : "Synced"}
+              </span>
+            </p>
+            <p className="mt-1 break-all font-mono text-[11.5px] leading-4 text-muted">
               {data.backend === "local"
-                ? "Local developer store (.data/grace-local.json)"
-                : data.backend === "supabase"
-                  ? "Supabase (service role)"
-                  : "Postgres (direct connection)"}
+                ? ".data/grace-local.json"
+                : "Service-role connection, server side only"}
             </p>
             <p className="mt-1 text-[14px] leading-5 text-sub">
               {data.backend === "local"
                 ? data.ephemeral
-                  ? "This deployment has no database, so accounts and chats reset whenever the function restarts. Connect Supabase before inviting people."
-                  : "Set POSTGRES_URL or SUPABASE_URL plus SUPABASE_SERVICE_ROLE_KEY to move data to Supabase. Everything else already works."
-                : "Chats, credits and sessions are stored in your Supabase project."}
+                  ? "No database is connected, so accounts and chats are lost when the server restarts. Connect Supabase before inviting anyone."
+                  : "Accounts, chats and keys live in a file on this machine. Add a Supabase project to share them across deploys."
+                : "Accounts, chats and keys are stored in your Supabase project, so they survive deploys."}
             </p>
           </section>
 
@@ -238,32 +249,14 @@ export function AdminView() {
             </div>
           </section>
 
-          <section className="mt-6">
-            <h2 className="mb-2 px-1 text-[13px] font-semibold tracking-[0.01em] text-muted">
-              Routing
-            </h2>
-            <ul className="divide-y divide-hairline rounded-[20px] border border-hairline bg-surface">
-              {data.models.map((model) => (
-                <li key={model.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                  <div className="min-w-0">
-                    <p className={`truncate text-[16px] ${model.available ? "text-ink" : "text-muted"}`}>
-                      {model.name}
-                    </p>
-                    <p className="text-[13px] text-sub">
-                      {model.providerLabel} · tier {model.tier}
-                    </p>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                      model.available ? "bg-accent-soft text-accent-text" : "border border-hairline text-muted"
-                    }`}
-                  >
-                    {model.available ? "Ready" : "No key"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
+          <div className="mt-6">
+            <ModelManager
+              onMessage={(text, ok) => {
+                setMessage({ text, ok });
+                window.setTimeout(() => setMessage(null), 4000);
+              }}
+            />
+          </div>
         </>
       )}
       <KeyModelsDialog

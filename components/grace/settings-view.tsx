@@ -30,9 +30,10 @@ type Props = {
   };
   providers: ProviderStatusView[];
   models: { id: string; name: string; providerLabel: string; credits: number; tier: number; available: boolean }[];
+  isAdmin: boolean;
 };
 
-export function SettingsView({ user, providers, models }: Props) {
+export function SettingsView({ user, providers, models, isAdmin }: Props) {
   const router = useRouter();
   const [name, setName] = useState(user.name);
   const [effort, setEffort] = useState(user.effort);
@@ -133,7 +134,7 @@ export function SettingsView({ user, providers, models }: Props) {
                     <span className={`w-[74px] shrink-0 ${effort === level.index ? "text-accent" : ""}`}>
                       {level.name.split(" ")[0]}
                     </span>
-                    <span className="truncate text-[13.5px] text-muted">{level.hint}</span>
+                    <span className="line-clamp-1 text-[13.5px] text-muted">{level.hint}</span>
                   </span>
                   {effort === level.index && <Check size={16} className="text-accent" />}
                 </button>
@@ -156,6 +157,14 @@ export function SettingsView({ user, providers, models }: Props) {
       </Section>
 
       <Section title="Providers">
+        {/* Keys are deployment-wide and owner-managed. A regular account cannot
+            add one, so the section states who can and what it means for them,
+            rather than showing an input that would be rejected. */}
+        <p className="mb-3 rounded-[14px] border border-hairline bg-control px-3.5 py-2.5 text-[13px] leading-5 text-sub">
+          {isAdmin
+            ? "You manage the keys everyone shares. Add, replace or remove them in the admin console."
+            : "Keys are managed by the workspace owner. Everything they connect is available to you here."}
+        </p>
         <div className="space-y-3">
           {providers.map((provider) => (
             <div key={provider.id} className="rounded-[16px] border border-hairline bg-control p-4">
@@ -170,25 +179,30 @@ export function SettingsView({ user, providers, models }: Props) {
                           : "border border-hairline text-muted"
                       }`}
                     >
-                      {provider.configured ? "Connected" : "Key needed"}
+                      {provider.configured ? "Connected" : isAdmin ? "Key needed" : "Unavailable"}
                     </span>
                   </p>
                   <p className="mt-1 text-[14px] leading-5 text-sub">{provider.blurb}</p>
-                  <p className="mt-2 font-mono text-[12px] text-muted">{provider.envKey}</p>
+                  {isAdmin && (
+                    <p className="mt-2 break-all font-mono text-[12px] text-muted">{provider.envKey}</p>
+                  )}
                 </div>
-                <a
-                  href={provider.docsUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex shrink-0 items-center gap-1 text-[13px] font-bold text-accent-text hover:underline"
-                >
-                  Get key <ExternalLink size={12} />
-                </a>
+                {isAdmin && (
+                  <a
+                    href={provider.docsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex shrink-0 items-center gap-1 text-[13px] font-bold text-accent-text hover:underline"
+                  >
+                    Get key <ExternalLink size={12} />
+                  </a>
+                )}
               </div>
               {!provider.configured && (
                 <p className="mt-2 text-[13px] leading-5 text-muted">
-                  Add this key in the admin console or as a Vercel environment variable, then reload
-                  this page.
+                  {isAdmin
+                    ? "Not connected yet. Add the key in the admin console to switch this provider on."
+                    : "Not available yet. The owner can switch this provider on for everyone."}
                 </p>
               )}
             </div>
@@ -201,7 +215,7 @@ export function SettingsView({ user, providers, models }: Props) {
           {models.map((model) => (
             <li key={model.id} className="flex items-center justify-between gap-3 px-4 py-3">
               <div className="min-w-0">
-                <p className={`truncate text-[16px] ${model.available ? "text-ink" : "text-muted"}`}>
+                <p className={`line-clamp-2 text-[15.5px] leading-5 ${model.available ? "text-ink" : "text-muted"}`}>
                   {model.name}
                 </p>
                 <p className="text-[13px] text-sub">
@@ -221,7 +235,7 @@ export function SettingsView({ user, providers, models }: Props) {
               <KeyRound size={16} className="text-accent" /> Admin console
             </p>
             <p className="mt-1 text-[14px] leading-5 text-sub">
-              Add provider keys without a redeploy, and check which models each provider can reach.
+              Add provider keys without a redeploy, and edit or remove any model in the catalog.
             </p>
             <Link
               href="/admin"

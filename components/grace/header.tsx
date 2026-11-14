@@ -20,7 +20,7 @@ type Props = {
  * button gives way to the product name — a hamburger that opens a duplicate
  * list is the clearest sign of a phone layout stretched onto a desktop.
  */
-export function Header({ remainingPct, onMenu, onUsage, agentName = "Grace 3" }: Props) {
+export function Header({ remainingPct, onMenu, onUsage, agentName = "Grace" }: Props) {
   return (
     <header className="relative z-20 h-[88px] shrink-0 bg-black px-4 pt-4 lg:px-8">
       <div className="flex items-start justify-between">

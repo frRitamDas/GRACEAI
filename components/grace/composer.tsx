@@ -124,7 +124,7 @@ export function Composer({
         </p>
       )}
 
-      <div className="relative flex items-start gap-0.5 rounded-[28px] border border-hairline bg-surface px-1.5 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition-shadow duration-200 focus-within:border-[#3A3A3F] focus-within:shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+      <div className="relative flex items-start gap-0.5 rounded-[28px] border border-hairline bg-surface px-1 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition-shadow duration-200 focus-within:border-[#3A3A3F] focus-within:shadow-[0_10px_30px_rgba(0,0,0,0.5)] sm:px-1.5">
         <AttachMenu
           open={menuOpen}
           onClose={() => onMenuOpenChange(false)}
@@ -148,7 +148,7 @@ export function Composer({
           onClick={() => onMenuOpenChange(!menuOpen)}
           aria-label={menuOpen ? "Close attach menu" : "Add attachment"}
           aria-expanded={menuOpen}
-          className="grid h-11 w-10 shrink-0 place-items-center rounded-full text-ink transition-colors hover:bg-raised active:scale-95"
+          className="grid h-11 w-9 shrink-0 place-items-center rounded-full text-ink transition-colors hover:bg-raised active:scale-95 sm:w-10"
         >
           {menuOpen ? <X size={22} /> : <Plus size={24} strokeWidth={2} aria-hidden="true" />}
         </button>
@@ -191,7 +191,7 @@ export function Composer({
             }}
             placeholder="Ask Grace"
             enterKeyHint="send"
-            className="scroll-quiet block w-full resize-none bg-transparent text-[17px] leading-[26px] tracking-[-0.011em] text-ink outline-none placeholder:text-muted"
+            className="scroll-quiet block w-full resize-none bg-transparent text-[16px] leading-[26px] tracking-[-0.011em] text-ink outline-none placeholder:text-muted sm:text-[17px]"
             style={{ maxHeight: 150 }}
           />
           {/* Desktop affordance: nobody discovers Shift+Enter by guessing. */}
@@ -206,7 +206,7 @@ export function Composer({
             onClick={onOpenModels}
             aria-label="Choose a model"
             title="Choose a model"
-            className="grid h-11 w-10 place-items-center rounded-full text-sub transition-colors hover:bg-raised hover:text-ink"
+            className="grid h-11 w-9 place-items-center rounded-full text-sub transition-colors hover:bg-raised hover:text-ink sm:w-10"
           >
             <ModelIcon />
           </button>
@@ -215,7 +215,7 @@ export function Composer({
             type="button"
             onClick={onOpenEffort}
             aria-label={`Effort: ${effortLabel}. Change effort`}
-            className="group grid h-11 w-10 place-items-center rounded-full transition-colors hover:bg-raised"
+            className="group grid h-11 w-9 place-items-center rounded-full transition-colors hover:bg-raised sm:w-10"
           >
             <GaugeIcon />
           </button>
@@ -226,7 +226,7 @@ export function Composer({
               onClick={startVoice}
               aria-label={listening ? "Stop voice input" : "Start voice input"}
               aria-pressed={listening}
-              className={`grid h-11 w-11 place-items-center rounded-full transition-colors hover:bg-raised ${
+              className={`grid h-11 w-10 place-items-center rounded-full transition-colors hover:bg-raised sm:w-11 ${
                 listening ? "text-accent" : "text-ink"
               }`}
             >

@@ -170,7 +170,7 @@ export function KeyModelsDialog({ open, provider, onClose, onSaved }: Props) {
                     >
                       <Box checked={on} />
                       <span className="min-w-0 flex-1">
-                        <span className={`block truncate text-[13.5px] leading-5 ${on ? "text-ink" : "text-sub"}`}>
+                        <span className={`line-clamp-2 block text-[13.5px] leading-5 ${on ? "text-ink" : "text-sub"}`}>
                           {model.name}
                         </span>
                       </span>

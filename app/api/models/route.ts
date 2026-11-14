@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { PROVIDERS } from "@/lib/ai/catalog";
+import { cachedCatalog, storeCatalog } from "@/lib/ai/catalog-cache";
 import { loadCatalog } from "@/lib/ai/discovery";
 import { getProviderStatus } from "@/lib/ai/env";
 
@@ -9,21 +10,19 @@ import { getProviderStatus } from "@/lib/ai/env";
  *
  * Providers report whether a key exists, never the key itself. Models are
  * discovered live once a key is present, so the picker shows what the provider
- * actually serves — including which models cost nothing.
+ * actually serves — including which models cost nothing — with the owner's
+ * edits applied on top.
  *
- * Discovery is the slow part (three provider calls), so the response carries a
- * short shared cache. `?fresh=1` skips it, which is what the admin console uses
- * right after a key is saved.
+ * Discovery is the slow part (three provider calls), so the built catalog is
+ * cached for two minutes in `lib/ai/catalog-cache`. That cache is cleared by any
+ * owner edit, so a hide or a reprice takes effect immediately; `?fresh=1` skips
+ * it entirely.
  */
-
-const CACHE_MS = 120_000;
-let cache: { at: number; body: string; status: number } | null = null;
 
 /**
  * Vercel caches an uncached route handler's response at the edge anyway, which
- * would freeze the catalog across deploys. `no-store` releases it; short edge
- * caching is left to the in-process cache above, which is what actually keeps
- * the three provider calls off the critical path.
+ * would freeze the catalog across deploys. `no-store` releases it; the only
+ * cache that matters is the in-process one above.
  */
 const HEADERS = {
   "Content-Type": "application/json",
@@ -34,11 +33,19 @@ const HEADERS = {
 export async function GET(request: Request) {
   const fresh = new URL(request.url).searchParams.get("fresh") === "1";
 
-  if (!fresh && cache && Date.now() - cache.at < CACHE_MS) {
-    return new NextResponse(cache.body, { status: cache.status, headers: HEADERS });
-  }
+  const [status, catalog] = await Promise.all([
+    getProviderStatus(),
+    (async () => {
+      if (!fresh) {
+        const hit = cachedCatalog();
+        if (hit) return hit;
+      }
+      const built = await loadCatalog();
+      storeCatalog(built);
+      return built;
+    })(),
+  ]);
 
-  const [status, catalog] = await Promise.all([getProviderStatus(), loadCatalog()]);
   const ready = new Set(status.filter((s) => s.configured).map((s) => s.id));
 
   const body = JSON.stringify({
@@ -59,8 +66,6 @@ export async function GET(request: Request) {
     liveProviders: catalog.live,
     anyConfigured: ready.size > 0,
   });
-
-  cache = { at: Date.now(), body, status: 200 };
 
   return new NextResponse(body, { status: 200, headers: HEADERS });
 }

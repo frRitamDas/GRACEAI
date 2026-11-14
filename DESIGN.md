@@ -48,7 +48,7 @@ Use this file as the reference when building new screens, components, or states 
 |---|---|---|---|---|
 | Greeting | 28px / 34px line height | 500 | `text-secondary` | "Where should we start, Ritam?" |
 | Modal title | 26px / 32px | 700 | `text-primary` | "Usage & Limits" |
-| Agent name pill | 18px / 24px | 700 | `text-primary` | "Grace 3" |
+| Agent name pill | 18px / 24px | 700 | `text-primary` | "Grace" |
 | Effort label | 32px / 40px | 700 | Mixed: first word `accent`, second word `text-primary` | "Instant effort" |
 | Menu item | 20px / 26px | 500 | `text-primary` | "Attach files" |
 | Body / stat label | 18px / 24px | 400 | `text-secondary` | "This month" |
@@ -87,7 +87,7 @@ Use an 8px base grid.
 ```
 +-----------------------------------+
 | (≡)        [avatar]        (92)   |  <- header: menu, agent, credits
-|             Grace 3               |
+|             Grace               |
 |                                   |
 |    Where should we start, Ritam?  |  <- greeting, centered
 |                                   |
@@ -113,7 +113,7 @@ Use an 8px base grid.
 |---|---|---|---|
 | Circular icon buttons | 50% (full circle) | none, or 1px `border` | none |
 | Agent avatar | 50% | 1px `border` | none |
-| Name pill ("Grace 3") | 999px | 1px `border` | none |
+| Name pill ("Grace") | 999px | 1px `border` | none |
 | Input bar | 999px | 1px `border` | none |
 | Dropdown menu | 24px | 1px `border` | 0 8px 24px rgba(0,0,0,0.5) |
 | Modal | 28px | 1px `border` | 0 16px 40px rgba(0,0,0,0.6) |
@@ -131,7 +131,7 @@ Use an 8px base grid.
 
 - **Menu button:** 56px circle, `control` background, three horizontal lines in `text-primary`. Opens the side drawer.
 - **Agent avatar:** 72px circle, `control` background, with the Grace logo mark in light gray. Sits centered and overlaps the top edge slightly.
-- **Name pill:** centered beneath the avatar, `control` background, 1px `border`, text "Grace 3" in bold.
+- **Name pill:** centered beneath the avatar, `control` background, 1px `border`, text "Grace" in bold.
 - **Credits ring:** 56px circle. A thin progress ring shows usage (white on dark, blue when a usage ring is active). The number inside (for example "92") is the remaining percentage.
   - Tapping it opens the **Usage & Limits** modal.
 
