@@ -4,8 +4,9 @@ A quiet, fast AI chat workspace. One input, five effort levels, and every
 frontier model behind a single router — OpenRouter, Groq, Google AI Studio and
 NVIDIA NIM.
 
-The interface follows [`DESIGN.md`](./DESIGN.md) exactly: flat black, one accent
-blue, fully rounded controls, and more than 48px touch targets everywhere.
+The interface follows [`DESIGN.md`](./DESIGN.md): a surface ladder from `bg` to
+`raised`, one accent blue, hairline borders instead of shadows, and 32–40px
+controls with generous hit areas.
 
 ![Home](./docs/screens/home.png)
 
@@ -16,7 +17,8 @@ blue, fully rounded controls, and more than 48px touch targets everywhere.
 | Chat with streaming answers | ✅ NDJSON stream, stop button, regenerate, copy |
 | Effort routing (Instant → Ultra) | ✅ five levels, temperature + reasoning hints, model tier mapping |
 | Frontier model picker | ✅ live discovery across OpenRouter, Groq, Google AI Studio plus a curated NVIDIA set, per-chat override |
-| Grace Code | ✅ a real file workspace with a multi-file agent, plus GitHub import and push |
+| Chat workspace | ✅ attach a repo to a chat behind a Code switch — Grace reads the files and writes changes back, you push |
+| Grace Code | ✅ a real file workspace with a multi-file agent, per-session model choice, GitHub import and push |
 | Provider connection | ✅ server-side keys (env or admin console), write-only from the browser |
 | Accounts | ✅ email + password, scrypt hashes, httpOnly session cookies |
 | Credits | ✅ per-turn cost by model and effort, monthly allowance, credits ring |
@@ -29,7 +31,7 @@ blue, fully rounded controls, and more than 48px touch targets everywhere.
 
 ![Usage](./docs/screens/usage.png)
 ![Models](./docs/screens/models.png)
-![Effort](./docs/screens/effort.png)
+![Grace Code](./docs/screens/code.png)
 
 The same panel for the owner account, which is never charged and has the
 purchase buttons removed:
@@ -108,11 +110,35 @@ override the pick from **Choose model** at any time.
 Once a provider key is present, Grace asks that provider what it actually
 serves rather than trusting a hardcoded list (`lib/ai/discovery.ts`):
 
-## Connecting GitHub
+## Working with a repository
+
+Two places can hold code: a **chat workspace** and a **Grace Code project**. They
+share one coding doctrine (`lib/ai/coding.ts`) and one fence parser, so the model
+behaves the same in both.
+
+### In a chat
+
+A chat is a conversation until you say otherwise. Turning **Code** on in the
+composer (or the header) lets Grace read that chat's workspace; the chevron
+beside the header pill opens the drawer where a repository is attached, files
+are edited or removed, and changes are pushed. It is off by default, and a chat
+with it off never touches a file.
+
+When a turn runs with the workspace on, the chat route builds a coding prompt
+from the attached files, and after the stream ends it applies the file blocks the
+model returned — whole files, path-tagged — then stores only the prose. Empty
+bodies are skipped, so a truncated reply can never wipe a file.
+
+- `GET /api/workspace/[id]` — the repo and the files
+- `PUT /api/workspace/[id]` — `{ repo: { owner, name, branch } | null }` attach/detach
+- `PUT|DELETE /api/workspace/[id]/files` — `{ path, content? }`
+- `POST /api/github/push` — `{ conversationId, paths?, message? }`
+
+### In Grace Code
 
 Grace Code can read a repository into a project and write the agent's edits
-back as commits. Two paths, both server-side only — the token never reaches the
-browser:
+back as commits, with a model chosen per session. Two paths, both server-side
+only — the token never reaches the browser:
 
 - **OAuth** (recommended): set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`,
   and point the app's callback at `{GRACE_APP_URL}/api/github/oauth/callback`.
