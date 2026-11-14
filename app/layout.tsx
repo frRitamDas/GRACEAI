@@ -32,8 +32,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className="h-full bg-black antialiased">
-      <body className="min-h-full bg-black font-sans text-white">{children}</body>
+    <html lang="en" className="h-full bg-bg antialiased">
+      <body className="min-h-full bg-bg font-sans text-ink">{children}</body>
     </html>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, Code2, ExternalLink, KeyRound, LogOut } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Code2, ExternalLink, KeyRound, LogOut } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -33,6 +33,14 @@ type Props = {
   isAdmin: boolean;
 };
 
+/**
+ * Settings.
+ *
+ * One column of labelled groups, each group a single bordered card with rows
+ * divided by hairlines — the shape people already know from macOS and GitHub.
+ * Rows that do something behave like links; rows that only report state have no
+ * hover, so nothing looks clickable that is not.
+ */
 export function SettingsView({ user, providers, models, isAdmin }: Props) {
   const router = useRouter();
   const [name, setName] = useState(user.name);
@@ -40,6 +48,7 @@ export function SettingsView({ user, providers, models, isAdmin }: Props) {
   const [showPct, setShowPct] = useState(user.showCreditPercentage);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [catalogOpen, setCatalogOpen] = useState(false);
 
   const save = async (patch: Record<string, unknown>) => {
     setBusy(true);
@@ -61,89 +70,88 @@ export function SettingsView({ user, providers, models, isAdmin }: Props) {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[720px] px-4 pb-16">
-      <header className="flex h-[88px] items-center gap-3">
-        <Link
-          href="/"
-          aria-label="Back to chat"
-          className="grid h-14 w-14 place-items-center rounded-full bg-control text-ink transition-opacity hover:opacity-90"
-        >
-          <ArrowLeft size={22} />
-        </Link>
-        <div className="min-w-0">
-          <h1 className="text-[24px] font-bold leading-8 text-ink">Settings</h1>
-          <p className="truncate text-[14px] leading-5 text-sub">{user.email}</p>
-        </div>
-        {saved && (
-          <span className="ml-auto flex items-center gap-1 rounded-full bg-control px-3 py-1.5 text-[13px] font-bold text-accent-text">
-            <Check size={14} /> Saved
+    <main className="canvas-wash min-h-[100dvh] w-full">
+      <div className="mx-auto w-full max-w-[620px] px-4 pb-20">
+        <header className="sticky top-0 z-10 -mx-4 mb-2 flex h-[52px] items-center gap-2 bg-bg/80 px-4 backdrop-blur-md">
+          <Link
+            href="/"
+            aria-label="Back to chat"
+            className="press grid h-8 w-8 place-items-center rounded-[7px] text-sub transition-colors hover:bg-white/[0.06] hover:text-ink"
+          >
+            <ArrowLeft size={16} />
+          </Link>
+          <h1 className="text-[13.5px] font-semibold text-ink">Settings</h1>
+          <span className="ml-auto flex items-center gap-1 text-[11px] text-muted">
+            {busy ? (
+              "Saving…"
+            ) : saved ? (
+              <>
+                <Check size={12} className="text-success" aria-hidden="true" />
+                <span className="text-success">Saved</span>
+              </>
+            ) : (
+              "Saves as you go"
+            )}
           </span>
-        )}
-      </header>
+        </header>
 
-      <Section title="Profile">
-        <div className="space-y-3">
-          <label className="block">
-            <span className="mb-1.5 block text-[14px] font-bold text-sub">Your first name</span>
+        <p className="mb-5 truncate text-[12px] text-muted">{user.email}</p>
+
+        <Group title="Profile">
+          <label className="flex items-center gap-3 px-3.5 py-2.5">
+            <span className="w-[110px] shrink-0 text-[12.5px] text-sub">Name</span>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
               onBlur={() => name.trim() && name !== user.name && void save({ name: name.trim() })}
-              className="h-[52px] w-full rounded-[16px] border border-hairline bg-control px-4 text-[17px] text-ink outline-none focus:border-accent"
+              className="h-8 min-w-0 flex-1 rounded-[7px] border border-transparent bg-white/[0.03] px-2.5 text-[12.5px] text-ink outline-none transition-colors hover:border-white/[0.07] focus:border-accent/50 focus:bg-white/[0.05]"
             />
           </label>
-          <div className="flex items-center justify-between rounded-[16px] border border-hairline bg-control px-4 py-3">
-            <div>
-              <p className="text-[16px] font-bold text-ink">Plan</p>
-              <p className="text-[14px] text-sub">
-                {user.unlimited ? "Owner: no limits, nothing charged" : `${user.credits} credits left`}
-              </p>
-            </div>
+          <Row label="Plan" detail={user.unlimited ? "Owner: nothing is charged" : `${user.credits} credits left`}>
             <span
-              className={`rounded-full border px-3 py-1 text-[12px] font-semibold ${
-                user.unlimited ? "border-accent bg-accent-soft text-accent-text" : "border-hairline text-ink"
+              className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${
+                user.unlimited ? "bg-accent-soft text-accent-text" : "bg-white/[0.06] text-sub"
               }`}
             >
               {user.unlimited ? "Owner" : user.plan}
             </span>
-          </div>
-        </div>
-      </Section>
+          </Row>
+        </Group>
 
-      <Section title="Answers">
-        <div className="space-y-3">
-          <div className="rounded-[16px] border border-hairline bg-control p-3">
-            <p className="px-1 pb-2 text-[14px] font-bold text-sub">Default effort</p>
-            <div className="grid gap-1.5">
-              {EFFORT_LEVELS.map((level) => (
-                <button
-                  key={level.id}
-                  type="button"
-                  aria-pressed={effort === level.index}
-                  onClick={() => {
-                    setEffort(level.index);
-                    void save({ effort: level.index });
-                  }}
-                  className={`flex h-12 w-full items-center justify-between rounded-[12px] px-3 text-[16px] transition-colors ${
-                    effort === level.index ? "bg-raised text-ink" : "text-sub hover:bg-raised hover:text-ink"
-                  }`}
-                >
-                  {/* The section is already "Default effort", so the row only
-                      needs the level. The hint carries the meaning. */}
-                  <span className="flex min-w-0 items-baseline gap-2.5">
-                    <span className={`w-[74px] shrink-0 ${effort === level.index ? "text-accent" : ""}`}>
+        <Group title="Answers">
+          <div className="px-3.5 py-3">
+            <p className="mb-2 text-[12.5px] text-sub">Default effort</p>
+            <div className="grid gap-1">
+              {EFFORT_LEVELS.map((level) => {
+                const active = effort === level.index;
+                return (
+                  <button
+                    key={level.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => {
+                      setEffort(level.index);
+                      void save({ effort: level.index });
+                    }}
+                    className={`press flex h-9 items-center gap-2 rounded-[7px] px-2 text-left transition-colors ${
+                      active ? "bg-white/[0.07]" : "hover:bg-white/[0.035]"
+                    }`}
+                  >
+                    <span
+                      className={`w-[68px] shrink-0 text-[12.5px] ${
+                        active ? "font-medium text-accent-text" : "text-sub"
+                      }`}
+                    >
                       {level.name.split(" ")[0]}
                     </span>
-                    <span className="line-clamp-1 text-[13.5px] text-muted">{level.hint}</span>
-                  </span>
-                  {effort === level.index && <Check size={16} className="text-accent" />}
-                </button>
-              ))}
+                    <span className="line-clamp-1 flex-1 text-[11.5px] text-muted">{level.hint}</span>
+                    {active && <Check size={13} className="shrink-0 text-accent" aria-hidden="true" />}
+                  </button>
+                );
+              })}
             </div>
           </div>
-
-          <div className="flex items-center justify-between rounded-[16px] border border-hairline bg-control px-4 py-3.5">
-            <span className="text-[16px] font-bold text-ink">Show credit percentage</span>
+          <Row label="Show credit percentage" detail="Percent instead of credits remaining">
             <Toggle
               checked={showPct}
               label="Show credit percentage"
@@ -152,123 +160,119 @@ export function SettingsView({ user, providers, models, isAdmin }: Props) {
                 void save({ showCreditPercentage: next });
               }}
             />
-          </div>
-        </div>
-      </Section>
+          </Row>
+        </Group>
 
-      <Section title="Providers">
-        {/* Keys are deployment-wide and owner-managed. A regular account cannot
-            add one, so the section states who can and what it means for them,
-            rather than showing an input that would be rejected. */}
-        <p className="mb-3 rounded-[14px] border border-hairline bg-control px-3.5 py-2.5 text-[13px] leading-5 text-sub">
-          {isAdmin
-            ? "You manage the keys everyone shares. Add, replace or remove them in the admin console."
-            : "Keys are managed by the workspace owner. Everything they connect is available to you here."}
-        </p>
-        <div className="space-y-3">
+        <Group title="Providers">
+          <p className="border-b border-hairline px-3.5 py-2.5 text-[11.5px] leading-[17px] text-muted">
+            {isAdmin
+              ? "Keys are deployment-wide. Add or replace them in the admin console."
+              : "Keys are managed by the workspace owner. Everything they connect works here."}
+          </p>
           {providers.map((provider) => (
-            <div key={provider.id} className="rounded-[16px] border border-hairline bg-control p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="flex items-center gap-2 text-[16px] font-bold text-ink">
-                    {provider.label}
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                        provider.configured
-                          ? "bg-accent-soft text-accent-text"
-                          : "border border-hairline text-muted"
-                      }`}
-                    >
-                      {provider.configured ? "Connected" : isAdmin ? "Key needed" : "Unavailable"}
-                    </span>
-                  </p>
-                  <p className="mt-1 text-[14px] leading-5 text-sub">{provider.blurb}</p>
-                  {isAdmin && (
-                    <p className="mt-2 break-all font-mono text-[12px] text-muted">{provider.envKey}</p>
-                  )}
-                </div>
-                {isAdmin && (
+            <Row
+              key={provider.id}
+              label={provider.label}
+              detail={isAdmin && !provider.configured ? provider.envKey : provider.blurb}
+            >
+              <span className="flex items-center gap-2">
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${
+                    provider.configured
+                      ? "bg-accent-soft text-accent-text"
+                      : "bg-white/[0.06] text-muted"
+                  }`}
+                >
+                  {provider.configured ? "On" : isAdmin ? "Key needed" : "Off"}
+                </span>
+                {isAdmin && !provider.configured && (
                   <a
                     href={provider.docsUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex shrink-0 items-center gap-1 text-[13px] font-bold text-accent-text hover:underline"
+                    aria-label={`Get a ${provider.label} key`}
+                    className="grid h-6 w-6 place-items-center rounded-[5px] text-muted hover:bg-white/[0.06] hover:text-ink"
                   >
-                    Get key <ExternalLink size={12} />
+                    <ExternalLink size={11} />
                   </a>
                 )}
-              </div>
-              {!provider.configured && (
-                <p className="mt-2 text-[13px] leading-5 text-muted">
-                  {isAdmin
-                    ? "Not connected yet. Add the key in the admin console to switch this provider on."
-                    : "Not available yet. The owner can switch this provider on for everyone."}
-                </p>
-              )}
-            </div>
+              </span>
+            </Row>
           ))}
-        </div>
-      </Section>
+        </Group>
 
-      <Section title="Model catalog">
-        <ul className="divide-y divide-hairline rounded-[16px] border border-hairline bg-control">
-          {models.map((model) => (
-            <li key={model.id} className="flex items-center justify-between gap-3 px-4 py-3">
-              <div className="min-w-0">
-                <p className={`line-clamp-2 text-[15.5px] leading-5 ${model.available ? "text-ink" : "text-muted"}`}>
-                  {model.name}
-                </p>
-                <p className="text-[13px] text-sub">
-                  {model.providerLabel} · tier {model.tier}
-                </p>
-              </div>
-              <span className="shrink-0 text-[13px] font-bold text-sub tabular-nums">{model.credits} cr</span>
-            </li>
-          ))}
-        </ul>
-      </Section>
+        <Group
+          title="Model catalog"
+          action={
+            <button
+              type="button"
+              onClick={() => setCatalogOpen((v) => !v)}
+              className="press flex items-center gap-1 rounded-[5px] px-1.5 py-0.5 text-[11px] text-muted hover:bg-white/[0.06] hover:text-ink"
+              aria-expanded={catalogOpen}
+            >
+              {catalogOpen ? "Hide" : `Show ${models.length}`}
+              <ChevronRight
+                size={11}
+                className={`transition-transform ${catalogOpen ? "rotate-90" : ""}`}
+                aria-hidden="true"
+              />
+            </button>
+          }
+        >
+          {!catalogOpen ? (
+            <Row
+              label={`${models.filter((m) => m.available).length} of ${models.length} available`}
+              detail={`${new Set(models.map((m) => m.providerLabel)).size} providers`}
+            />
+          ) : (
+            models.map((model) => (
+              <Row key={model.id} label={model.name} detail={`${model.providerLabel} · tier ${model.tier}`}>
+                <span
+                  className={`text-[11px] tabular-nums ${model.available ? "text-sub" : "text-muted"}`}
+                >
+                  {model.credits} cr
+                </span>
+              </Row>
+            ))
+          )}
+        </Group>
 
-      {user.isAdmin && (
-        <Section title="Deployment owner">
-          <div className="rounded-[16px] border border-hairline bg-control p-4">
-            <p className="flex items-center gap-2 text-[16px] font-bold text-ink">
-              <KeyRound size={16} className="text-accent" /> Admin console
-            </p>
-            <p className="mt-1 text-[14px] leading-5 text-sub">
-              Add provider keys without a redeploy, and edit or remove any model in the catalog.
-            </p>
+        {user.isAdmin && (
+          <Group title="Deployment owner">
             <Link
               href="/admin"
-              className="mt-3 inline-flex h-11 items-center rounded-full bg-accent px-4 text-[15px] font-bold text-white"
+              className="press flex items-center gap-3 px-3.5 py-2.5 first:rounded-t-[13px] last:rounded-b-[13px] hover:bg-white/[0.035]"
             >
-              Open console
-            </Link>
-          </div>
-        </Section>
-      )}
-
-      <Section title="Workspace">
-        <div className="space-y-2">
-          <Link
-            href="/code"
-            className="flex items-start gap-3 rounded-[16px] border border-hairline bg-control p-4 transition-colors hover:border-[#3A3A3F]"
-          >
-            <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent-soft text-accent-text">
-              <Code2 size={17} aria-hidden="true" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="flex flex-wrap items-center gap-2 text-[15px] font-semibold text-ink">
-                Grace Code
-                <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold text-accent-text">
-                  New
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[6px] bg-accent-soft text-accent-text">
+                <KeyRound size={13} aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[12.5px] text-ink">Admin console</span>
+                <span className="block text-[11.5px] text-muted">
+                  Provider keys and the model catalog, without a redeploy.
                 </span>
               </span>
-              <span className="mt-0.5 block text-[13.5px] leading-5 text-sub">
-                A coding workspace. Grace reads a project&apos;s files and writes changes back.
+              <ChevronRight size={13} className="shrink-0 text-muted" aria-hidden="true" />
+            </Link>
+          </Group>
+        )}
+
+        <Group title="Workspace">
+          <Link
+            href="/code"
+            className="press flex items-center gap-3 px-3.5 py-2.5 hover:bg-white/[0.035]"
+          >
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[6px] bg-accent-soft text-accent-text">
+              <Code2 size={13} aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[12.5px] text-ink">Grace Code</span>
+              <span className="block text-[11.5px] text-muted">
+                A coding workspace that reads files and writes changes back.
               </span>
             </span>
+            <ChevronRight size={13} className="shrink-0 text-muted" aria-hidden="true" />
           </Link>
-
           <button
             type="button"
             onClick={async () => {
@@ -276,33 +280,68 @@ export function SettingsView({ user, providers, models, isAdmin }: Props) {
               router.replace("/");
               router.refresh();
             }}
-            className="flex w-full items-center gap-3 rounded-[16px] border border-hairline bg-control p-4 text-left transition-colors hover:border-[#3A3A3F]"
+            className="press flex w-full items-center gap-3 border-t border-hairline px-3.5 py-2.5 text-left hover:bg-white/[0.035]"
           >
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#211618] text-[#E08A8A]">
-              <LogOut size={16} aria-hidden="true" />
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[6px] bg-danger/10 text-danger">
+              <LogOut size={13} aria-hidden="true" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold text-ink">Sign out</span>
-              <span className="mt-0.5 block text-[13.5px] leading-5 text-sub">
+              <span className="block text-[12.5px] text-ink">Sign out</span>
+              <span className="block text-[11.5px] text-muted">
                 You will need your password to come back.
               </span>
             </span>
           </button>
-        </div>
-      </Section>
+        </Group>
 
-      <p className="mt-8 text-center text-[13px] text-muted">
-        Grace can make mistakes. {busy ? "Saving…" : "Changes save as you go."}
-      </p>
-    </div>
+        <p className="mt-8 text-center text-[11px] text-muted">Grace can make mistakes.</p>
+      </div>
+    </main>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/** One labelled group: a heading and a single bordered card of rows. */
+function Group({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="mt-6">
-      <h2 className="mb-2 px-1 text-[13px] font-semibold tracking-[0.01em] text-muted">{title}</h2>
-      {children}
+    <section className="mt-5">
+      <div className="mb-1.5 flex items-center justify-between px-1">
+        <h2 className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted">
+          {title}
+        </h2>
+        {action}
+      </div>
+      <div className="overflow-hidden rounded-[14px] border border-hairline bg-surface">
+        {children}
+      </div>
     </section>
+  );
+}
+
+/** A report row: a label, an optional second line, and a trailing value. */
+function Row({
+  label,
+  detail,
+  children,
+}: {
+  label: string;
+  detail?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-3 border-b border-hairline px-3.5 py-2.5 last:border-b-0">
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[12.5px] text-ink">{label}</span>
+        {detail && <span className="mt-0.5 block truncate text-[11.5px] text-muted">{detail}</span>}
+      </span>
+      {children}
+    </div>
   );
 }

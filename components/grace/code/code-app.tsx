@@ -12,6 +12,7 @@ import {
   MessagesSquare,
   Plus,
   Settings2,
+  Sparkles,
   Square,
   Trash2,
   Upload,
@@ -23,6 +24,7 @@ import { FileTree } from "@/components/grace/code/file-tree";
 import { GithubSheet } from "@/components/grace/code/github-sheet";
 import { GithubMark } from "@/components/grace/github-mark";
 import { GraceMark } from "@/components/grace/logo";
+import { ModelSheet, type CatalogModel } from "@/components/grace/model-sheet";
 import type { CodeMessage, Project, ProjectFile } from "@/lib/code/store";
 
 /**
@@ -34,7 +36,11 @@ import type { CodeMessage, Project, ProjectFile } from "@/lib/code/store";
  * 300px editor under a 300px chat is worse than either alone.
  */
 
-type Props = { initialProjects: Project[] };
+type Props = {
+  initialProjects: Project[];
+  initialModels: CatalogModel[];
+  userModel: string | null;
+};
 
 type Panel = "chat" | "files" | "editor";
 
@@ -46,7 +52,7 @@ const LANGUAGES = [
   { id: "go", label: "Go" },
 ];
 
-export function CodeApp({ initialProjects }: Props) {
+export function CodeApp({ initialProjects, initialModels, userModel }: Props) {
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [activeId, setActiveId] = useState<string | null>(initialProjects[0]?.id ?? null);
   const [project, setProject] = useState<Project | null>(initialProjects[0] ?? null);
@@ -64,9 +70,18 @@ export function CodeApp({ initialProjects }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
 
   const [touched, setTouched] = useState<string[]>([]);
+  // A file the *user* opened. Only that one is worth telling the model to read
+  // first — a file the project happened to load is not a decision.
+  const [pickedPath, setPickedPath] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [githubOpen, setGithubOpen] = useState(false);
   const [pushing, setPushing] = useState(false);
+
+  // Model choice is per session, like chat: pick once and every turn after uses
+  // it. Auto means "let Grace pick the strongest coding model available".
+  const [models] = useState<CatalogModel[]>(initialModels);
+  const [model, setModel] = useState<string | null>(userModel);
+  const [modelsOpen, setModelsOpen] = useState(false);
 
   // The OAuth callback returns to /code?github=…; the sheet was unmounted while
   // the browser was away on github.com, so reopen it and explain the result.
@@ -277,7 +292,12 @@ export function CodeApp({ initialProjects }: Props) {
       const response = await fetch("/api/code/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: project.id, message: text }),
+        body: JSON.stringify({
+          projectId: project.id,
+          message: text,
+          model,
+          focus: pickedPath,
+        }),
         signal: controller.signal,
       });
 
@@ -350,29 +370,36 @@ export function CodeApp({ initialProjects }: Props) {
 
 
   return (
-    <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-black text-ink">
+    <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-bg text-ink">
       {/* ---------------------------------------------------------------- top */}
-      <header className="glass-bar relative z-20 flex h-[56px] shrink-0 items-center gap-1.5 border-b border-white/[0.07] px-2.5 sm:gap-2 sm:px-3 lg:px-4">
+      <header className="glass-bar relative z-20 flex h-[52px] shrink-0 items-center gap-1.5 border-b border-hairline px-2 sm:gap-2 sm:px-3">
         <Link
           href="/"
           aria-label="Back to chat"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sub transition-colors hover:bg-control hover:text-ink"
+          title="Back to chat"
+          className="press grid h-8 w-8 shrink-0 place-items-center rounded-[7px] text-sub transition-colors hover:bg-white/[0.06] hover:text-ink"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={16} />
         </Link>
 
-        <span className="flex shrink-0 items-center gap-1.5 text-[15px] font-semibold tracking-[-0.01em]">
-          <Code2 size={16} className="shrink-0 text-accent" aria-hidden="true" />
-          <span className="hidden xs:inline">Grace Code</span>
+        <span className="flex shrink-0 items-center gap-1.5">
+          <Code2 size={14} className="shrink-0 text-accent" aria-hidden="true" />
+          <span className="hidden text-[13.5px] font-semibold tracking-[-0.01em] xs:inline">
+            Grace Code
+          </span>
         </span>
 
-        {project && streaming && (
-          <>
-            <span className="hidden h-4 w-px bg-hairline sm:block" aria-hidden="true" />
-            <span className="hidden min-w-0 truncate text-[13.5px] text-sub sm:block">
-              Working
-            </span>
-          </>
+        {project && (
+          <span className="hidden min-w-0 items-center gap-1.5 truncate text-[12px] text-muted sm:flex">
+            <span aria-hidden="true" className="text-white/15">/</span>
+            <span className="truncate">{project.name}</span>
+            {streaming && (
+              <span className="ml-1 flex shrink-0 items-center gap-1.5 rounded-full bg-accent-soft px-2 py-0.5 text-[10.5px] font-medium text-accent-text">
+                <span className="h-1 w-1 rounded-full bg-accent" aria-hidden="true" />
+                working
+              </span>
+            )}
+          </span>
         )}
 
         <div className="ml-auto flex min-w-0 items-center gap-1">
@@ -390,32 +417,31 @@ export function CodeApp({ initialProjects }: Props) {
           <button
             type="button"
             onClick={() => setGithubOpen(true)}
-            aria-label="Connect GitHub"
-            title="Connect GitHub"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-sub transition-colors hover:bg-control hover:text-ink"
+            aria-label="GitHub"
+            title="GitHub"
+            className="press grid h-8 w-8 shrink-0 place-items-center rounded-[7px] text-sub transition-colors hover:bg-white/[0.06] hover:text-ink"
           >
-            <GithubMark size={15} />
+            <GithubMark size={14} />
           </button>
           <button
             type="button"
             onClick={() => setCreating(true)}
-            aria-label="New project"
-            title="New project"
-            className="flex h-8 items-center gap-1.5 rounded-full bg-ink px-2.5 text-[12.5px] font-semibold text-black sm:px-3"
+            className="press flex h-8 items-center gap-1.5 rounded-[7px] bg-ink px-2.5 text-[12px] font-semibold text-black"
           >
-            <FolderPlus size={14} strokeWidth={2.6} aria-hidden="true" />
-            <span className="hidden sm:inline">New project</span>
+            <FolderPlus size={13} strokeWidth={2.6} aria-hidden="true" />
+            <span className="hidden xs:inline">New</span>
           </button>
           <button
             type="button"
             onClick={() => setShowSettings((v) => !v)}
             aria-pressed={showSettings}
             aria-label="Project settings"
-            className={`grid h-8 w-8 place-items-center rounded-full transition-colors ${
-              showSettings ? "bg-raised text-ink" : "text-sub hover:bg-control hover:text-ink"
+            title="Project settings"
+            className={`press grid h-8 w-8 place-items-center rounded-[7px] transition-colors ${
+              showSettings ? "bg-white/[0.09] text-ink" : "text-sub hover:bg-white/[0.06] hover:text-ink"
             }`}
           >
-            <Settings2 size={15} />
+            <Settings2 size={14} />
           </button>
         </div>
       </header>
@@ -423,7 +449,7 @@ export function CodeApp({ initialProjects }: Props) {
       {notice && (
         <p
           role="status"
-          className="flex shrink-0 items-center gap-2 border-b border-hairline bg-control px-4 py-2 text-[13px] text-sub"
+          className="animate-fade-in flex shrink-0 items-center gap-2 border-b border-hairline bg-surface px-4 py-1.5 text-[12.5px] text-sub"
         >
           <span className="flex-1">{notice}</span>
           <button
@@ -446,7 +472,7 @@ export function CodeApp({ initialProjects }: Props) {
             {/* files — a rail on desktop, a tab on a phone */}
             <aside
               aria-label="Project files"
-              className={`min-h-0 w-full shrink-0 flex-col border-r border-hairline bg-black lg:flex lg:w-[220px] ${
+              className={`min-h-0 w-full shrink-0 flex-col border-r border-hairline bg-panel lg:flex lg:w-[228px] ${
                 panel === "files" ? "flex" : "hidden"
               }`}
             >
@@ -456,6 +482,7 @@ export function CodeApp({ initialProjects }: Props) {
                 touched={touched}
                 onOpen={(path) => {
                   setOpenPath(path);
+                  setPickedPath(path);
                   setPanel("editor");
                 }}
                 onDelete={(path) => void patchFile({ path, remove: true })}
@@ -473,6 +500,21 @@ export function CodeApp({ initialProjects }: Props) {
                 panel === "chat" ? "flex" : "hidden"
               }`}
             >
+              <div className="flex h-9 shrink-0 items-center gap-2 border-b border-hairline px-3">
+                <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">
+                  <MessagesSquare size={11} aria-hidden="true" />
+                  Session
+                </span>
+                {messages.length > 0 && (
+                  <span className="rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-sub">
+                    {messages.length}
+                  </span>
+                )}
+                <span className="ml-auto truncate text-[10.5px] text-muted">
+                  {files.length} file{files.length === 1 ? "" : "s"} in context
+                </span>
+              </div>
+
               <div ref={scrollRef} className="scroll-quiet min-h-0 flex-1 overflow-y-auto px-4 py-4">
                 {loading && (
                   <p className="flex items-center gap-2 text-[13px] text-sub">
@@ -481,15 +523,18 @@ export function CodeApp({ initialProjects }: Props) {
                 )}
 
                 {!loading && messages.length === 0 && (
-                  <div className="pt-6">
-                    <p className="text-[15px] font-medium leading-6 text-ink">
+                  <div className="animate-fade-up flex flex-col items-start pt-5">
+                    <span className="grid h-8 w-8 place-items-center rounded-[9px] border border-hairline bg-surface">
+                      <GraceMark className="h-4 w-4" />
+                    </span>
+                    <p className="mt-3 text-[15px] font-semibold leading-6 tracking-[-0.01em] text-ink">
                       What are we building?
                     </p>
-                    <p className="mt-1.5 text-[13.5px] leading-5 text-sub">
-                      Grace reads every file in {project?.name ?? "this project"} and writes changes
-                      back. Ask for a feature, a fix, or an explanation.
+                    <p className="mt-1 text-[13px] leading-5 text-sub">
+                      Grace reads every file in {project?.name ?? "this project"} and writes the
+                      changes back. Ask for a feature, a fix, or an explanation.
                     </p>
-                    <div className="mt-3 flex flex-wrap gap-1.5">
+                    <div className="mt-3.5 flex w-full flex-col gap-1.5">
                       {[
                         "Explain what this project does",
                         "Add error handling to the entry point",
@@ -499,9 +544,10 @@ export function CodeApp({ initialProjects }: Props) {
                           key={prompt}
                           type="button"
                           onClick={() => setInput(prompt)}
-                          className="rounded-full border border-hairline px-3 py-1.5 text-left text-[12.5px] leading-4 text-sub transition-colors hover:border-[#3A3A3F] hover:text-ink"
+                          className="surface surface-hover flex h-9 items-center gap-2 px-2.5 text-left text-[12.5px] text-sub hover:text-ink"
                         >
-                          {prompt}
+                          <span className="text-muted" aria-hidden="true">↗</span>
+                          <span className="truncate">{prompt}</span>
                         </button>
                       ))}
                     </div>
@@ -531,8 +577,21 @@ export function CodeApp({ initialProjects }: Props) {
                 )}
               </div>
 
-              <div className="shrink-0 border-t border-hairline p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-                <div className="flex items-end gap-1.5 rounded-[20px] border border-hairline bg-surface px-2 py-2 transition-colors focus-within:border-[#3A3A3F]">
+              <div className="shrink-0 border-t border-hairline bg-panel/60 px-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-sm">
+                {pickedPath && (
+                  <p className="mb-1.5 flex items-center gap-1.5 px-1.5 text-[10.5px] text-muted">
+                    <Code2 size={10} aria-hidden="true" />
+                    <span className="truncate font-mono text-sub">{pickedPath}</span>
+                    <button
+                      type="button"
+                      onClick={() => setPickedPath(null)}
+                      className="shrink-0 underline decoration-dotted hover:text-ink"
+                    >
+                      clear
+                    </button>
+                  </p>
+                )}
+                <div className="flex items-end gap-1.5 rounded-[18px] border border-hairline bg-surface px-1.5 py-1.5 shadow-[0_1px_0_0_rgba(255,255,255,0.03)_inset] transition-colors focus-within:border-[#3A3A3F]">
                   <textarea
                     ref={textareaRef}
                     value={input}
@@ -571,21 +630,35 @@ export function CodeApp({ initialProjects }: Props) {
                     </button>
                   )}
                 </div>
-                <p className="mt-1.5 px-1 text-[11px] leading-4 text-muted">
-                  Files are replaced whole. Review a change before you rely on it.
-                </p>
+
+                <div className="mt-1.5 flex items-center gap-1.5 px-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setModelsOpen(true)}
+                    className="press flex h-6 items-center gap-1 rounded-full border border-hairline bg-control px-2 text-[11px] font-medium text-sub transition-colors hover:border-[#333338] hover:text-ink"
+                    aria-label={`Model: ${model ? (models.find((m) => m.id === model)?.name ?? model) : "Auto"}`}
+                  >
+                    <Sparkles size={10} className="text-accent" aria-hidden="true" />
+                    <span className="max-w-[150px] truncate">
+                      {model ? (models.find((m) => m.id === model)?.name ?? model) : "Auto"}
+                    </span>
+                  </button>
+                  <span className="min-w-0 flex-1 truncate text-right text-[10.5px] leading-4 text-muted">
+                    Files are replaced whole. Review what changed.
+                  </span>
+                </div>
               </div>
             </section>
 
             {/* editor */}
             <section
               aria-label="File contents"
-              className={`min-h-0 flex-1 flex-col bg-black lg:flex ${
+              className={`min-h-0 flex-1 flex-col bg-bg lg:flex ${
                 panel === "editor" ? "flex" : "hidden"
               }`}
             >
               {project?.repo && (
-                <div className="flex shrink-0 items-center gap-2 border-b border-hairline bg-[#0B0B0D] px-3 py-1.5">
+                <div className="flex h-9 shrink-0 items-center gap-2 border-b border-hairline bg-panel px-3">
                   <GithubMark size={12} />
                   <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-sub">
                     {project.repo.owner}/{project.repo.name}
@@ -631,7 +704,7 @@ export function CodeApp({ initialProjects }: Props) {
       {projects.length > 0 && (
         <nav
           aria-label="Workspace panels"
-          className="grid shrink-0 grid-cols-3 border-t border-hairline bg-black lg:hidden"
+          className="glass-bar grid h-[52px] shrink-0 grid-cols-3 border-t border-hairline pb-[env(safe-area-inset-bottom)] lg:hidden"
         >
           {(
             [
@@ -659,6 +732,19 @@ export function CodeApp({ initialProjects }: Props) {
       {creating && (
         <NewProjectDialog onCancel={() => setCreating(false)} onCreate={createProject} />
       )}
+
+      <ModelSheet
+        open={modelsOpen}
+        onClose={() => setModelsOpen(false)}
+        models={models}
+        selected={model}
+        onSelect={(id) => {
+          setModel(id);
+          setModelsOpen(false);
+        }}
+        anyConfigured={models.some((m) => m.available)}
+        isAdmin={false}
+      />
 
       <GithubSheet
         open={githubOpen}
@@ -814,7 +900,7 @@ function CodeBubble({
         <div
           className={
             isUser
-              ? "rounded-[16px] bg-[#232326] px-3.5 py-2 text-[14px] leading-[21px] text-ink"
+              ? "rounded-[14px] rounded-br-[5px] bg-[#1d1d22] px-3 py-2 text-[13.5px] leading-[21px] text-ink"
               : "text-[14px] leading-[22px] text-ink"
           }
         >

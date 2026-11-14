@@ -144,7 +144,7 @@ export function AdminView() {
               <span
                 className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                   data.backend === "local" && data.ephemeral
-                    ? "bg-[#3A2A16] text-[#E0B341]"
+                    ? "bg-warning/10 text-warning"
                     : "bg-accent-soft text-accent-text"
                 }`}
               >

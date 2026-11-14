@@ -8,11 +8,17 @@ import { Sparkles, X } from "lucide-react";
 import { Composer } from "@/components/grace/composer";
 import { Drawer, type ConversationSummary } from "@/components/grace/drawer";
 import { EffortSheet } from "@/components/grace/effort-sheet";
+import { GithubMark } from "@/components/grace/github-mark";
 import { Greeting } from "@/components/grace/greeting";
 import { Header } from "@/components/grace/header";
 import { MessageRow, ScrollToBottom, type ChatMessage } from "@/components/grace/message";
 import { ModelSheet, type CatalogModel } from "@/components/grace/model-sheet";
 import { SideRail } from "@/components/grace/side-rail";
+import {
+  WorkspacePanel,
+  type WorkspaceFileInfo,
+  type WorkspaceRepo,
+} from "@/components/grace/workspace-panel";
 import { UsageModal, type UsageData } from "@/components/grace/usage-modal";
 import { EFFORT_LEVELS, type ProviderId } from "@/lib/ai/catalog";
 import type { AttachmentView, SessionUserView } from "@/lib/client/types";
@@ -63,10 +69,19 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
   const [menuOpen, setMenuOpen] = useState(false);
   const [notice, setNotice] = useState<{ text: string; action?: { label: string; href: string } } | null>(null);
 
+  // A chat can carry a workspace: some files, optionally from a repository.
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [codeMode, setCodeMode] = useState(false);
+  const [workspaceRepo, setWorkspaceRepo] = useState<WorkspaceRepo | null>(null);
+  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFileInfo[]>([]);
+  const [railCollapsed, setRailCollapsed] = useState(false);
+  const [openFilePath, setOpenFilePath] = useState<string | null>(null);
+
   const abortRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
   const stickToBottom = useRef(true);
   const [showJump, setShowJump] = useState(false);
 
@@ -114,6 +129,24 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
     return () => {
       alive = false;
     };
+  }, []);
+
+  /** Pulls a conversation's workspace: its repo and whatever files it holds. */
+  const loadWorkspace = useCallback(async (id: string) => {
+    try {
+      const response = await fetch(`/api/workspace/${id}`, { cache: "no-store" });
+      if (!response.ok) return;
+      const data = (await response.json()) as {
+        repo: WorkspaceRepo | null;
+        files: WorkspaceFileInfo[];
+      };
+      setWorkspaceRepo(data.repo);
+      setWorkspaceFiles(data.files);
+      // Code mode follows the workspace: a chat holding a repo is a code chat.
+      if (data.repo || data.files.length > 0) setCodeMode(true);
+    } catch {
+      /* the chat still works without its workspace */
+    }
   }, []);
 
   const refreshConversations = useCallback(async () => {
@@ -186,6 +219,29 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
       }
 
       setNotice(null);
+      // A workspace turn needs a conversation to hold its files, so make one up
+      // front when this is the first message of a new chat.
+      let startId = conversationId;
+      if (codeMode && !startId) {
+        try {
+          const made = await fetch("/api/conversations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: text ? text.slice(0, 56) : "New chat" }),
+          });
+          if (made.ok) {
+            const data = (await made.json()) as { conversation?: { id: string } };
+            if (data.conversation?.id) {
+              startId = data.conversation.id;
+              setConversationId(startId);
+              refreshConversations();
+            }
+          }
+        } catch {
+          /* fall through: the turn still works, just without files */
+        }
+      }
+
       const optimisticId = `pending-${Date.now()}`;
       const outbound = attachments;
       setMessages((prev) => [
@@ -221,7 +277,7 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
           headers: { "Content-Type": "application/json" },
           signal: controller.signal,
           body: JSON.stringify({
-            conversationId,
+            conversationId: startId,
             message: text,
             attachments: outbound.map((a) => ({
               name: a.name,
@@ -232,6 +288,8 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
             effort: user.effort,
             model: selectedModel,
             deepResearch,
+            workspace: codeMode,
+            focus: openFilePath,
           }),
         });
 
@@ -338,6 +396,24 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
                 setNotice({ text: messageText });
               }
             }
+            if (event.type === "files") {
+              // The workspace now holds new files. Replace the streamed text with
+              // the prose the server kept, so the file blocks do not linger in
+              // the bubble, and refresh the file list.
+              const cleaned = typeof event.text === "string" ? event.text : null;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === `${optimisticId}-reply` && cleaned
+                    ? {
+                        ...m,
+                        content: cleaned,
+                        files: Array.isArray(event.paths) ? (event.paths as string[]) : m.files,
+                      }
+                    : m
+                )
+              );
+              if (meta) void loadWorkspace((meta as unknown as StreamMeta).conversationId);
+            }
             if (event.type === "saved") {
               refreshUsage();
             }
@@ -383,6 +459,9 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
       selectedModel,
       sending,
       user.effort,
+      codeMode,
+      openFilePath,
+      loadWorkspace,
     ]
   );
 
@@ -450,6 +529,9 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
     setAttachments([]);
     setNotice(null);
     setSending(false);
+    setWorkspaceRepo(null);
+    setWorkspaceFiles([]);
+    setOpenFilePath(null);
   };
 
   const openConversation = async (id: string) => {
@@ -487,6 +569,7 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
       );
       setNotice(null);
       stickToBottom.current = true;
+      void loadWorkspace(data.conversation.id);
       requestAnimationFrame(() => scrollToBottom("auto"));
     } catch {
       setNotice({ text: "That chat could not be opened." });
@@ -534,28 +617,38 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
   const empty = messages.length === 0;
 
   return (
-    <div className="flex h-[100dvh] w-full overflow-hidden bg-black">
+    <div className="flex h-[100dvh] w-full overflow-hidden bg-bg">
       {/* Wide screens get a real rail; the drawer below covers phones. */}
       <SideRail
         user={user}
         conversations={conversations}
         activeId={conversationId}
+        collapsed={railCollapsed}
         onSelect={(id) => void openConversation(id)}
         onNew={newChat}
         onDelete={(id) => void deleteConversation(id)}
         onSignOut={() => void signOut()}
       />
 
-      <div className="relative mx-auto flex h-[100dvh] min-w-0 flex-1 flex-col overflow-hidden bg-black">
+      <div className="canvas-wash relative mx-auto flex h-[100dvh] min-w-0 flex-1 flex-col overflow-hidden">
       <Header
         remainingPct={usage.remainingPct}
         onMenu={() => setDrawerOpen(true)}
         onUsage={() => setUsageOpen(true)}
+        onToggleRail={() => setRailCollapsed((v) => !v)}
+        railCollapsed={railCollapsed}
         subtitle={
           selectedModel
             ? (models.find((m) => m.id === selectedModel)?.name ?? "Auto")
             : "Auto model"
         }
+        workspace={{
+          enabled: codeMode,
+          repo: workspaceRepo ? `${workspaceRepo.owner}/${workspaceRepo.name}` : null,
+          files: workspaceFiles.length,
+          onToggle: () => setCodeMode((v) => !v),
+          onOpen: () => setWorkspaceOpen(true),
+        }}
       />
 
       <main
@@ -565,13 +658,49 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
         aria-live="off"
       >
         {empty ? (
-          <div className="flex h-full flex-col items-center justify-center gap-1 pb-16 pt-4">
+          <div className="flex h-full flex-col items-center justify-center pb-14 pt-4">
             <Greeting name={greetingName} />
+
+            {/* Starters: four ways in, each one a real thing Grace can do here.
+                They fill the composer rather than sending, so the first turn is
+                still the user's wording. */}
+            <div className="animate-fade-up mt-7 grid w-full max-w-[600px] grid-cols-1 gap-2 px-1 sm:grid-cols-2">
+              {(codeMode
+                ? [
+                    { title: "Read a repository", body: "Attach a repo and explain how it fits together." },
+                    { title: "Plan a change", body: "Outline the files to touch before anything is written." },
+                    { title: "Fix a failing path", body: "Paste an error and trace it to the cause." },
+                    { title: "Write the README", body: "Setup, usage, and the parts that are easy to get wrong." },
+                  ]
+                : [
+                    { title: "Explain something", body: "A concept, a document, or a piece of code." },
+                    { title: "Draft and revise", body: "Write it, then tighten it until it reads well." },
+                    { title: "Work through a problem", body: "Lay out the options and argue for one." },
+                    { title: "Build something small", body: "A script, a page, or a fix — end to end." },
+                  ]
+              ).map((starter) => (
+                <button
+                  key={starter.title}
+                  type="button"
+                  onClick={() => {
+                    setInput(`${starter.title}: `);
+                    composerInputRef.current?.focus();
+                  }}
+                  className="surface surface-hover lift group px-3.5 py-3 text-left"
+                >
+                  <p className="text-[12.5px] font-semibold text-ink">{starter.title}</p>
+                  <p className="mt-0.5 text-[12px] leading-[17px] text-muted group-hover:text-sub">
+                    {starter.body}
+                  </p>
+                </button>
+              ))}
+            </div>
+
             {!providerReady && (
               // Keys are deployment-wide, so this tells people what is missing
               // and, only for the owner, where to fix it. A regular account is
               // pointed at the owner rather than an input it cannot use.
-              <p className="mt-5 flex max-w-[min(100%,26rem)] flex-wrap items-center justify-center gap-x-1.5 gap-y-1 rounded-[16px] border border-hairline bg-surface px-3.5 py-2 text-center text-[13px] leading-5 text-sub">
+              <p className="mt-4 flex max-w-[min(100%,26rem)] flex-wrap items-center justify-center gap-x-1.5 gap-y-1 rounded-[16px] border border-hairline bg-surface px-3.5 py-2 text-center text-[13px] leading-5 text-sub">
                 <Sparkles size={14} className="shrink-0 text-accent" aria-hidden="true" />
                 {user.isAdmin ? (
                   <>
@@ -595,6 +724,10 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
                 message={message}
                 onRetry={regenerate}
                 isLast={index === messages.length - 1}
+                onOpenFile={(path) => {
+                  setOpenFilePath(path);
+                  setWorkspaceOpen(true);
+                }}
               />
             ))}
           </div>
@@ -603,7 +736,7 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
 
       {showJump && !empty && <ScrollToBottom onClick={() => scrollToBottom()} />}
 
-      <div className="relative z-10 mx-auto w-full max-w-[720px] shrink-0 bg-black px-4 pb-2 pt-2 lg:px-0">
+      <div className="relative z-10 mx-auto w-full max-w-[760px] shrink-0 px-3 pb-1.5 pt-1.5 sm:px-4">
         {notice && (
           <div
             role="status"
@@ -642,6 +775,7 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
           }}
         />
         <Composer
+          inputRef={composerInputRef}
           value={input}
           onChange={setInput}
           onSend={() => void send()}
@@ -652,6 +786,20 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
           onOpenEffort={() => setEffortOpen((v) => !v)}
           onOpenModels={() => setModelOpen(true)}
           effortLabel={effortLabel}
+          modelLabel={
+            selectedModel
+              ? (models.find((m) => m.id === selectedModel)?.name ?? "Auto")
+              : "Auto"
+          }
+          codeMode={{
+            enabled: codeMode,
+            onToggle: () => setCodeMode((v) => !v),
+            detail: workspaceRepo
+              ? `${workspaceRepo.owner}/${workspaceRepo.name}`
+              : workspaceFiles.length > 0
+                ? `${workspaceFiles.length} files`
+                : null,
+          }}
           deepResearchOn={deepResearch}
           onToggleDeepResearch={() => setDeepResearch((v) => !v)}
           attachments={attachments.map((a) => ({ id: a.id, name: a.name }))}
@@ -659,9 +807,20 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
           menuOpen={menuOpen}
           onMenuOpenChange={setMenuOpen}
         />
-        <p className="mt-2 pb-[env(safe-area-inset-bottom)] text-center text-[14px] leading-5 text-muted">
-          Grace can make mistakes.
-        </p>
+        {codeMode && !workspaceRepo && workspaceFiles.length === 0 ? (
+          <button
+            type="button"
+            onClick={() => setWorkspaceOpen(true)}
+            className="mt-1 flex w-full items-center justify-center gap-1.5 text-[10.5px] leading-4 text-accent-text/80 hover:text-accent-text"
+          >
+            <GithubMark size={10} />
+            Code mode is on. Attach a repository so Grace can read your files.
+          </button>
+        ) : (
+          <p className="mt-1.5 pb-[max(2px,env(safe-area-inset-bottom))] text-center text-[10.5px] leading-4 text-muted">
+            Grace can make mistakes. Check code before you push it.
+          </p>
+        )}
       </div>
 
       </div>
@@ -704,6 +863,24 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
         onDelete={(id) => void deleteConversation(id)}
         onSignOut={() => void signOut()}
         onOpenUsage={() => setUsageOpen(true)}
+      />
+
+      <WorkspacePanel
+        open={workspaceOpen}
+        onClose={() => setWorkspaceOpen(false)}
+        conversationId={conversationId}
+        repo={workspaceRepo}
+        files={workspaceFiles}
+        codeMode={codeMode}
+        onToggleCodeMode={() => setCodeMode((v) => !v)}
+        onChanged={({ repo, files }) => {
+          setWorkspaceRepo(repo);
+          setWorkspaceFiles(files);
+        }}
+        onConversation={(id) => {
+          setConversationId(id);
+          refreshConversations();
+        }}
       />
 
       <UsageModal

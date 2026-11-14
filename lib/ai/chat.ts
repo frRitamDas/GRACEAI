@@ -50,8 +50,12 @@ function effortParams(model: ModelDef, effortIndex: number) {
 /** Providers that can read images in the OpenAI `image_url` shape. */
 const VISION_PROVIDERS: ProviderId[] = ["openrouter", "google"];
 
-function buildMessages(turns: ChatTurn[], attachments: ChatAttachment[]) {
-  const messages: Record<string, unknown>[] = [{ role: "system", content: SYSTEM_PROMPT }];
+function buildMessages(
+  turns: ChatTurn[],
+  attachments: ChatAttachment[],
+  systemPrompt: string = SYSTEM_PROMPT
+) {
+  const messages: Record<string, unknown>[] = [{ role: "system", content: systemPrompt }];
 
   for (const turn of turns.slice(-40)) {
     messages.push({ role: turn.role, content: turn.content });
@@ -80,10 +84,11 @@ function requestBody(
   effortIndex: number,
   turns: ChatTurn[],
   attachments: ChatAttachment[],
-  stream: boolean
+  stream: boolean,
+  systemPrompt?: string
 ) {
   const { temperature } = effortParams(model, effortIndex);
-  const { messages, images } = buildMessages(turns, attachments);
+  const { messages, images } = buildMessages(turns, attachments, systemPrompt);
 
   if (images.length && VISION_PROVIDERS.includes(model.provider)) {
     const last = messages[messages.length - 1];
@@ -214,6 +219,11 @@ export type StreamOptions = {
   turns: ChatTurn[];
   attachments: ChatAttachment[];
   signal?: AbortSignal;
+  /**
+   * Replaces the default Grace persona. Grace Code and the chat workspace pass
+   * an engineering prompt here; the plain chat leaves it undefined.
+   */
+  systemPrompt?: string;
 };
 
 /**
@@ -221,7 +231,7 @@ export type StreamOptions = {
  * for provider problems so the route can always close the stream cleanly.
  */
 export async function* streamChat(options: StreamOptions): AsyncGenerator<StreamEvent> {
-  const { key, model, effortIndex, turns, attachments, signal } = options;
+  const { key, model, effortIndex, turns, attachments, signal, systemPrompt } = options;
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -239,7 +249,7 @@ export async function* streamChat(options: StreamOptions): AsyncGenerator<Stream
     response = await fetch(providerEndpoint(model.provider), {
       method: "POST",
       headers,
-      body: JSON.stringify(requestBody(model, effortIndex, turns, attachments, true)),
+      body: JSON.stringify(requestBody(model, effortIndex, turns, attachments, true, systemPrompt)),
       signal,
       cache: "no-store",
     });

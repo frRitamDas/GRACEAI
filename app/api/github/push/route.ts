@@ -3,25 +3,41 @@ import { z } from "zod";
 
 import { getCurrentUser } from "@/lib/auth/session";
 import { getProject, listFiles } from "@/lib/code/store";
+import { getConversation } from "@/lib/db/store";
 import { commitFiles, readRepoFiles } from "@/lib/github/client";
+import { listWorkspaceFiles } from "@/lib/workspace/store";
 
 /**
- * Writes a project's files back to its GitHub repository.
+ * Writes files back to GitHub.
  *
- * The shas are re-read from GitHub at push time rather than trusted from the
- * import. A project imported an hour ago would otherwise carry stale blob shas,
- * and the write would fail with a conflict; re-reading also means a file that
- * changed on GitHub since the import is caught before anything is overwritten.
+ * Two callers, one behaviour: a Grace Code project pushes the files it was told
+ * to push, and a chat workspace pushes its whole working tree. Both re-read the
+ * remote shas first. A project imported an hour ago would otherwise carry stale
+ * blob shas and fail with a conflict; re-reading also catches a file that
+ * changed on GitHub since the import before anything is overwritten.
  *
- * Only files named in the request are pushed. Sending the whole project would
- * turn an untouched import into a commit that says nothing changed.
+ * Only files that are actually wanted are sent. Dumping the whole tree would
+ * turn an untouched import into a commit that changed nothing.
  */
 
-const schema = z.object({
-  projectId: z.string().min(1).max(64),
-  paths: z.array(z.string().min(1).max(200)).min(1).max(40),
-  message: z.string().trim().max(200).optional(),
-});
+const schema = z.union([
+  z.object({
+    projectId: z.string().min(1).max(64),
+    paths: z.array(z.string().min(1).max(240)).min(1).max(40),
+    message: z.string().trim().max(200).optional(),
+  }),
+  z.object({
+    conversationId: z.string().min(1).max(64),
+    paths: z.array(z.string().min(1).max(240)).max(40).optional(),
+    message: z.string().trim().max(200).optional(),
+  }),
+]);
+
+type Target = {
+  repo: { owner: string; name: string; branch: string };
+  files: { path: string; content: string }[];
+  label: string;
+};
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -34,41 +50,75 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Choose at least one file to push." }, { status: 400 });
   }
 
-  const project = await getProject(user.id, body.projectId);
-  if (!project) return NextResponse.json({ error: "That project is gone." }, { status: 404 });
-  if (!project.repo) {
-    return NextResponse.json(
-      { error: "This project is not linked to a repository." },
-      { status: 400 }
-    );
+  let target: Target | null = null;
+
+  if ("projectId" in body) {
+    const project = await getProject(user.id, body.projectId);
+    if (!project) return NextResponse.json({ error: "That project is gone." }, { status: 404 });
+    if (!project.repo) {
+      return NextResponse.json(
+        { error: "This project is not linked to a repository." },
+        { status: 400 }
+      );
+    }
+    const files = await listFiles(project.id);
+    const wanted = new Set(body.paths);
+    const selected = files.filter((f) => wanted.has(f.path));
+    if (selected.length === 0) {
+      return NextResponse.json({ error: "None of those files exist here." }, { status: 400 });
+    }
+    target = {
+      repo: project.repo,
+      files: selected.map((f) => ({ path: f.path, content: f.content })),
+      label: "Grace Code",
+    };
+  } else {
+    const conversation = await getConversation(user.id, body.conversationId);
+    if (!conversation) return NextResponse.json({ error: "That chat is gone." }, { status: 404 });
+    if (!conversation.repo) {
+      return NextResponse.json(
+        { error: "Attach a repository to this chat first." },
+        { status: 400 }
+      );
+    }
+    const files = await listWorkspaceFiles(body.conversationId);
+    if (files.length === 0) {
+      return NextResponse.json({ error: "This workspace has no files yet." }, { status: 400 });
+    }
+    const wanted = body.paths ? new Set(body.paths) : null;
+    target = {
+      repo: conversation.repo,
+      files: files
+        .filter((f) => !wanted || wanted.has(f.path))
+        .map((f) => ({ path: f.path, content: f.content })),
+      label: "Grace",
+    };
   }
 
-  const files = await listFiles(project.id);
-  const wanted = new Set(body.paths);
-  const selected = files.filter((f) => wanted.has(f.path));
-  if (selected.length === 0) {
-    return NextResponse.json({ error: "None of those files exist here." }, { status: 400 });
+  if (target.files.length === 0) {
+    return NextResponse.json({ error: "Nothing to push." }, { status: 400 });
   }
 
   // The remote is the authority on what a file's current sha is.
   const remote = await readRepoFiles(
     user.id,
-    project.repo.owner,
-    project.repo.name,
-    project.repo.branch
+    target.repo.owner,
+    target.repo.name,
+    target.repo.branch
   );
   if (remote.error) {
     return NextResponse.json({ error: remote.error }, { status: 400 });
   }
   const shas = new Map(remote.files.map((f) => [f.path, f.sha]));
 
+  const count = target.files.length;
   const result = await commitFiles(
     user.id,
-    project.repo.owner,
-    project.repo.name,
-    project.repo.branch,
-    selected.map((f) => ({ path: f.path, content: f.content, sha: shas.get(f.path) ?? null })),
-    body.message || `Grace Code: update ${selected.length} file${selected.length === 1 ? "" : "s"}`
+    target.repo.owner,
+    target.repo.name,
+    target.repo.branch,
+    target.files.map((f) => ({ path: f.path, content: f.content, sha: shas.get(f.path) ?? null })),
+    body.message || `${target.label}: update ${count} file${count === 1 ? "" : "s"}`
   );
 
   if (result.error) {
@@ -78,6 +128,6 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     written: result.written,
-    url: `https://github.com/${project.repo.owner}/${project.repo.name}/tree/${project.repo.branch}`,
+    url: `https://github.com/${target.repo.owner}/${target.repo.name}/tree/${target.repo.branch}`,
   });
 }

@@ -57,26 +57,26 @@ export function UsageModal({
   return (
     <Overlay open={open} onClose={onClose} variant="center" labelledBy="usage-title" className="w-full max-w-[420px] animate-modal-in">
       <div className="glass-strong overflow-hidden rounded-[28px]">
-        <div className="p-5">
-          <div className="mb-5 flex items-center justify-between gap-3">
-            <h2 id="usage-title" className="text-[26px] font-bold leading-8 tracking-[-0.01em] text-ink">
-              Usage &amp; Limits
+        <div className="p-4 sm:p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 id="usage-title" className="text-[19px] font-semibold leading-7 tracking-[-0.015em] text-ink">
+              Usage &amp; limits
             </h2>
             <span
               className={
                 unlimited
-                  ? "rounded-full border border-accent bg-accent-soft px-3 py-1.5 text-[12px] font-semibold text-accent-text"
-                  : "rounded-full bg-control px-3 py-1.5 text-[12px] font-semibold text-ink"
+                  ? "rounded-full border border-accent/40 bg-accent-soft px-2.5 py-1 text-[11px] font-semibold text-accent-text"
+                  : "rounded-full bg-control px-2.5 py-1 text-[11px] font-semibold text-sub"
               }
             >
               {unlimited ? "Owner" : (PLAN_LABEL[plan] ?? plan)}
             </span>
           </div>
 
-          <div className="rounded-[20px] border border-hairline bg-control px-4 py-4">
+          <div className="rounded-[14px] border border-hairline bg-surface px-3.5 py-3.5">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-[18px] leading-6 text-sub">This month</span>
-              <span className="text-[18px] font-bold leading-6 text-ink tabular-nums">
+              <span className="text-[13px] leading-5 text-sub">This month</span>
+              <span className="text-[13px] font-semibold leading-5 text-ink tabular-nums">
                 {unlimited
                   ? "No limits"
                   : showPercentage
@@ -85,7 +85,7 @@ export function UsageModal({
               </span>
             </div>
             <div
-              className="mt-3 h-2 w-full overflow-hidden rounded-full bg-hairline"
+              className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-hairline"
               role="progressbar"
               aria-valuemin={0}
               aria-valuemax={100}
@@ -93,25 +93,25 @@ export function UsageModal({
               aria-label="Credits used this month"
             >
               <div
-                className="h-full rounded-full bg-ink transition-[width] duration-500 ease-out"
+                className="h-full rounded-full bg-accent transition-[width] duration-500 ease-out"
                 style={{ width: `${Math.max(usedPct, usedPct > 0 ? 3 : 0)}%` }}
               />
             </div>
-            <p className="mt-2.5 text-[14px] leading-5 text-sub">
+            <p className="mt-2 text-[12px] leading-[18px] text-muted">
               {unlimited
                 ? `Owner account: every model, every effort, no credit checks. ${usage ? `${usage.used} credits used this month for reference.` : ""}`
                 : `${usage ? `${remaining} of ${usage.allowance} credits left.` : "Loading your allowance…"} Resets ${usage?.resets ?? "next month"}.`}
             </p>
           </div>
 
-          <div className="mt-3 flex items-center justify-between rounded-[20px] border border-hairline bg-control px-4 py-3.5">
-            <span className="text-[18px] font-bold leading-6 text-ink">Show credit percentage</span>
+          <div className="mt-2 flex items-center justify-between gap-3 rounded-[14px] border border-hairline bg-surface px-3.5 py-3">
+            <span className="text-[13px] font-medium leading-5 text-ink">Show credit percentage</span>
             <Toggle checked={showPercentage} onChange={onTogglePercentage} label="Show credit percentage" />
           </div>
 
           {/* An owner can never be charged, so purchase buttons would be a dead end. */}
           {!unlimited && (
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-2 grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => {
@@ -119,7 +119,7 @@ export function UsageModal({
                 onBuyApex();
                 setBuying(null);
               }}
-              className="h-[52px] rounded-full border border-accent bg-accent-soft text-[18px] font-bold text-accent-text transition-opacity hover:opacity-90 active:opacity-80 disabled:opacity-60"
+              className="press h-10 rounded-[10px] border border-accent/40 bg-accent-soft text-[13px] font-semibold text-accent-text transition-opacity hover:opacity-90 active:opacity-80 disabled:opacity-60"
               aria-busy={buying === "apex"}
             >
               Buy Apex
@@ -131,7 +131,7 @@ export function UsageModal({
                 onBuyCredits();
                 setBuying(null);
               }}
-              className="h-[52px] rounded-full bg-accent text-[18px] font-bold text-white transition-opacity hover:opacity-90 active:opacity-80 disabled:opacity-60"
+              className="press h-10 rounded-[10px] bg-accent text-[13px] font-semibold text-white transition-opacity hover:opacity-90 active:opacity-80 disabled:opacity-60"
               aria-busy={buying === "credits"}
             >
               Buy credits
@@ -145,7 +145,7 @@ export function UsageModal({
             type="button"
             onClick={onClose}
             data-autofocus
-            className="h-[56px] w-full text-[18px] font-bold text-sub transition-colors hover:text-ink"
+            className="press h-11 w-full text-[13px] font-semibold text-sub transition-colors hover:bg-white/[0.03] hover:text-ink"
           >
             Done
           </button>

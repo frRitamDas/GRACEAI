@@ -80,7 +80,7 @@ export function FileTree({
           <li key={child.path}>
             <p
               style={indent}
-              className="py-1 text-[11px] font-semibold tracking-[0.02em] text-muted"
+              className="flex items-center gap-1.5 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.07em] text-muted"
             >
               {child.name}
             </p>
@@ -101,8 +101,8 @@ export function FileTree({
             style={indent}
             className={`flex h-8 w-full items-center gap-1.5 rounded-[8px] pr-8 text-left text-[12.5px] transition-colors duration-100 ${
               isActive
-                ? "bg-raised font-medium text-ink"
-                : "text-sub hover:bg-[#161618] hover:text-ink"
+                ? "bg-white/[0.075] font-medium text-ink"
+                : "text-sub hover:bg-white/[0.04] hover:text-ink"
             }`}
           >
             <span className={wasTouched ? "text-accent" : "text-muted"}>{iconFor(child.path)}</span>
@@ -118,7 +118,7 @@ export function FileTree({
             type="button"
             onClick={() => onDelete(child.path)}
             aria-label={`Delete ${child.name}`}
-            className="absolute right-1 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full text-muted opacity-0 transition-opacity hover:bg-control hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
+            className="absolute right-1 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-[5px] text-muted opacity-0 transition-opacity hover:bg-white/[0.1] hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
           >
             <Trash2 size={11} aria-hidden="true" />
           </button>
@@ -128,18 +128,19 @@ export function FileTree({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center justify-between px-2 pb-1 pt-1">
-        <p className="text-[11px] font-semibold tracking-[0.02em] text-muted">Files</p>
+      <div className="flex h-9 shrink-0 items-center justify-between border-b border-hairline px-2.5">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">Files</p>
         <button
           type="button"
           onClick={onNewFile}
           aria-label="New file"
-          className="grid h-6 w-6 place-items-center rounded-full text-muted hover:bg-control hover:text-ink"
+          title="New file"
+          className="press grid h-6 w-6 place-items-center rounded-[6px] text-muted hover:bg-white/[0.07] hover:text-ink"
         >
           <Plus size={13} aria-hidden="true" />
         </button>
       </div>
-      <nav aria-label="Project files" className="scroll-quiet min-h-0 flex-1 overflow-y-auto px-1">
+      <nav aria-label="Project files" className="scroll-quiet min-h-0 flex-1 overflow-y-auto p-1.5">
         {files.length === 0 ? (
           <p className="px-2 py-3 text-[12.5px] leading-4 text-muted">
             No files yet. Ask Grace to create one.

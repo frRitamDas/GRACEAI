@@ -1,7 +1,8 @@
 "use client";
 
-import { Code2, LogOut, MessageSquarePlus, Settings2, ShieldCheck, Trash2 } from "lucide-react";
+import { Code2, LogOut, MessageSquarePlus, Search, Settings2, ShieldCheck, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useMemo, useState } from "react";
 
 import { GraceMark } from "@/components/grace/logo";
 import type { ConversationSummary } from "@/components/grace/drawer";
@@ -10,6 +11,7 @@ type Props = {
   user: { name: string; plan: string; isAdmin: boolean; unlimited: boolean } | null;
   conversations: ConversationSummary[];
   activeId: string | null;
+  collapsed?: boolean;
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
@@ -17,115 +19,185 @@ type Props = {
 };
 
 /**
- * The wide-screen rail. On a phone the same history lives in the drawer; on a
- * desktop the drawer would be a wasted click, so the list sits permanently
- * beside the conversation and the chat column keeps its comfortable measure.
+ * Desktop history rail.
+ *
+ * Sections are grouped by age rather than one long list — a hundred chats in
+ * date order is a haystack. It collapses to zero width (the header owns the
+ * toggle) so the conversation can use the whole window, which is what you want
+ * while reading a long answer.
  */
-export function SideRail({ user, conversations, activeId, onSelect, onNew, onDelete, onSignOut }: Props) {
+export function SideRail({
+  user,
+  conversations,
+  activeId,
+  collapsed = false,
+  onSelect,
+  onNew,
+  onDelete,
+  onSignOut,
+}: Props) {
+  const [query, setQuery] = useState("");
+
+  const groups = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const filtered = needle
+      ? conversations.filter((c) => c.title.toLowerCase().includes(needle))
+      : conversations;
+
+    // Sorted newest-first by the server, and bucketed by a recentness key that
+    // does not need the wall clock: the most recent day, the week before it,
+    // then everything else. Labels stay honest without a re-render at midnight.
+    const dayKeys = Array.from(
+      new Set(filtered.map((c) => new Date(c.updatedAt).toDateString()))
+    );
+    const recent = new Set(dayKeys.slice(0, 1));
+    const week = new Set(dayKeys.slice(0, 7));
+
+    const buckets: { label: string; items: ConversationSummary[] }[] = [
+      { label: "Today", items: [] },
+      { label: "Earlier this week", items: [] },
+      { label: "Older", items: [] },
+    ];
+    for (const conversation of filtered) {
+      const key = new Date(conversation.updatedAt).toDateString();
+      if (recent.has(key)) buckets[0].items.push(conversation);
+      else if (week.has(key)) buckets[1].items.push(conversation);
+      else buckets[2].items.push(conversation);
+    }
+    return buckets.filter((b) => b.items.length > 0);
+  }, [conversations, query]);
+
   return (
     <aside
       aria-label="Chat history"
-      className="hidden w-[260px] shrink-0 flex-col border-r border-hairline bg-black px-3 pb-4 pt-4 lg:flex xl:w-[288px]"
+      aria-hidden={collapsed}
+      className={`hidden shrink-0 overflow-hidden border-r border-hairline bg-panel transition-[width] duration-200 lg:flex lg:flex-col ${
+        collapsed ? "w-0 border-r-0" : "w-[264px] xl:w-[280px]"
+      }`}
     >
-      <div className="flex items-center gap-2.5 px-2 pb-4">
-        <span className="grid h-9 w-9 place-items-center rounded-full border border-hairline bg-control text-[#C9C9CC]">
-          <GraceMark className="h-5 w-5" />
+      <div className="flex items-center gap-2 px-3 pb-2 pt-3">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[8px] border border-white/[0.08] bg-white/[0.04]">
+          <GraceMark className="h-[17px] w-[17px]" />
         </span>
-        <div className="min-w-0">
-          <p className="truncate text-[15px] font-semibold leading-5 text-ink">Grace</p>
-          <p className="flex items-center gap-1.5 text-[12px] leading-4 text-muted">
-            {user?.unlimited ? (
-              <span className="font-semibold text-accent-text">Owner</span>
-            ) : (
-              "Free plan"
-            )}
-          </p>
+        <p className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-ink">Grace</p>
+        <span
+          className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.04em] ${
+            user?.unlimited ? "bg-accent-soft text-accent-text" : "bg-white/[0.06] text-muted"
+          }`}
+        >
+          {user?.unlimited ? "Owner" : "Free"}
+        </span>
+      </div>
+
+      <div className="px-2.5 pb-1.5">
+        <button
+          type="button"
+          onClick={onNew}
+          className="press flex h-8 w-full items-center gap-2 rounded-[8px] border border-white/[0.07] bg-white/[0.03] px-2.5 text-[12.5px] font-medium text-ink hover:border-white/[0.13] hover:bg-white/[0.06]"
+        >
+          <MessageSquarePlus size={14} strokeWidth={2.2} aria-hidden="true" />
+          New chat
+        </button>
+      </div>
+
+      <div className="px-2.5 pb-1">
+        <div className="relative">
+          <Search
+            size={12}
+            className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted"
+            aria-hidden="true"
+          />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search chats"
+            aria-label="Search chats"
+            className="h-7 w-full rounded-[7px] border border-transparent bg-transparent pl-6 pr-2 text-[12px] text-ink outline-none placeholder:text-muted hover:border-white/[0.07] focus:border-white/[0.12] focus:bg-white/[0.03]"
+          />
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={onNew}
-        className="press mb-3 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-ink text-[15px] font-semibold text-black"
-      >
-        <MessageSquarePlus size={17} strokeWidth={2.4} aria-hidden="true" />
-        New chat
-      </button>
-
-      <p className="px-2 pb-1.5 pt-1 text-[11px] font-semibold tracking-[0.01em] text-muted">
-        Recent
-      </p>
-
-      <nav className="scroll-quiet -mx-1 flex-1 overflow-y-auto px-1">
+      <nav className="scroll-quiet min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         {conversations.length === 0 && (
-          <p className="px-2 py-3 text-[13px] leading-5 text-muted">
-            Your chats will collect here.
+          <p className="px-2 py-4 text-[12px] leading-5 text-muted">
+            Your chats collect here.
           </p>
         )}
-        <ul className="space-y-0.5">
-          {conversations.map((conversation) => {
-            const active = conversation.id === activeId;
-            return (
-              <li key={conversation.id} className="group relative">
-                <button
-                  type="button"
-                  onClick={() => onSelect(conversation.id)}
-                  aria-current={active ? "page" : undefined}
-                  className={`flex h-9 w-full items-center rounded-[10px] px-2.5 pr-9 text-left text-[13.5px] transition-colors duration-100 ${
-                    active
-                      ? "bg-raised font-medium text-ink"
-                      : "text-sub hover:bg-[#161618] hover:text-ink"
-                  }`}
-                >
-                  <span className="truncate">{conversation.title}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(conversation.id)}
-                  aria-label={`Delete ${conversation.title}`}
-                  className="absolute right-1 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-muted opacity-0 transition-opacity hover:bg-control hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
-                >
-                  <Trash2 size={13} aria-hidden="true" />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        {conversations.length > 0 && groups.length === 0 && (
+          <p className="px-2 py-4 text-[12px] leading-5 text-muted">Nothing matches that.</p>
+        )}
+
+        {groups.map((group) => (
+          <div key={group.label} className="mb-1.5">
+            <p className="px-2 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">
+              {group.label}
+            </p>
+            <ul className="space-y-px">
+              {group.items.map((conversation) => {
+                const active = conversation.id === activeId;
+                return (
+                  <li key={conversation.id} className="group relative">
+                    <button
+                      type="button"
+                      onClick={() => onSelect(conversation.id)}
+                      aria-current={active ? "page" : undefined}
+                      className={`flex h-[30px] w-full items-center rounded-[7px] px-2 pr-7 text-left text-[12.5px] transition-colors duration-100 ${
+                        active
+                          ? "bg-white/[0.08] font-medium text-ink"
+                          : "text-sub hover:bg-white/[0.045] hover:text-ink"
+                      }`}
+                    >
+                      <span className="truncate">{conversation.title}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDelete(conversation.id)}
+                      aria-label={`Delete ${conversation.title}`}
+                      className="press absolute right-0.5 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-[6px] text-muted opacity-0 hover:bg-white/[0.08] hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
+                    >
+                      <Trash2 size={11} aria-hidden="true" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
-      <div className="mt-3 space-y-0.5 border-t border-hairline pt-3">
+      <div className="space-y-px border-t border-hairline p-2">
         <Link
           href="/code"
-          className="group flex h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-[13.5px] text-sub transition-colors hover:bg-[#161618] hover:text-ink"
+          className="press flex h-8 items-center gap-2 rounded-[7px] px-2 text-[12.5px] text-sub transition-colors hover:bg-white/[0.045] hover:text-ink"
         >
-          <Code2 size={15} aria-hidden="true" />
+          <Code2 size={14} aria-hidden="true" />
           <span className="flex-1">Grace Code</span>
-          <span className="rounded-full bg-control px-1.5 py-0.5 text-[9.5px] font-semibold text-accent-text">
-            New
+          <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[9px] font-semibold text-accent-text">
+            Code
           </span>
         </Link>
         <Link
           href="/settings"
-          className="flex h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-[13.5px] text-sub transition-colors hover:bg-[#161618] hover:text-ink"
+          className="press flex h-8 items-center gap-2 rounded-[7px] px-2 text-[12.5px] text-sub transition-colors hover:bg-white/[0.045] hover:text-ink"
         >
-          <Settings2 size={15} aria-hidden="true" />
+          <Settings2 size={14} aria-hidden="true" />
           Settings
         </Link>
         {user?.isAdmin && (
           <Link
             href="/admin"
-            className="flex h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-[13.5px] text-sub transition-colors hover:bg-[#161618] hover:text-ink"
+            className="press flex h-8 items-center gap-2 rounded-[7px] px-2 text-[12.5px] text-sub transition-colors hover:bg-white/[0.045] hover:text-ink"
           >
-            <ShieldCheck size={15} aria-hidden="true" />
-            Admin console
+            <ShieldCheck size={14} aria-hidden="true" />
+            Admin
           </Link>
         )}
         <button
           type="button"
           onClick={onSignOut}
-          className="flex h-9 w-full items-center gap-2.5 rounded-[10px] px-2.5 text-[13.5px] text-sub transition-colors hover:bg-[#161618] hover:text-ink"
+          className="press flex h-8 w-full items-center gap-2 rounded-[7px] px-2 text-[12.5px] text-sub transition-colors hover:bg-white/[0.045] hover:text-ink"
         >
-          <LogOut size={15} aria-hidden="true" />
+          <LogOut size={14} aria-hidden="true" />
           Sign out
         </button>
       </div>

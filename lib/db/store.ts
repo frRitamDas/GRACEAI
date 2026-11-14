@@ -24,12 +24,19 @@ import { publicUser, type SessionUser } from "@/lib/auth/session";
 const USER_COLUMNS =
   "id, email, name, is_admin, unlimited, plan, credits, effort, provider, model, show_credit_percentage, created_at";
 
+export type ConversationRepo = { owner: string; name: string; branch: string };
+
 export type Conversation = {
   id: string;
   title: string;
   createdAt: string;
   updatedAt: string;
+  /** Set when this chat has a GitHub workspace attached. */
+  repo?: ConversationRepo | null;
 };
+
+/** Columns to select when a caller only needs the conversation itself. */
+const CONVERSATION_COLUMNS = "id, title, created_at, updated_at, repo_owner, repo_name, repo_branch";
 
 export type Message = {
   id: string;
@@ -46,11 +53,15 @@ export type Message = {
 };
 
 function toConversation(row: Record<string, unknown>): Conversation {
+  const owner = row.repo_owner as string | null | undefined;
+  const name = row.repo_name as string | null | undefined;
+  const branch = row.repo_branch as string | null | undefined;
   return {
     id: String(row.id),
     title: String(row.title ?? "New chat"),
     createdAt: String(row.created_at ?? nowIso()),
     updatedAt: String(row.updated_at ?? nowIso()),
+    repo: owner && name && branch ? { owner, name, branch } : null,
   };
 }
 
@@ -276,7 +287,7 @@ export async function listConversations(userId: string): Promise<Conversation[]>
   if (supabase) {
     const { data } = await supabase
       .from("grace_conversations")
-      .select("id, title, created_at, updated_at")
+      .select(CONVERSATION_COLUMNS)
       .eq("user_id", userId)
       .order("updated_at", { ascending: false })
       .limit(200);
@@ -285,7 +296,7 @@ export async function listConversations(userId: string): Promise<Conversation[]>
   const sql = getSql();
   if (!sql) return [];
   const rows = await sql`
-    select id, title, created_at, updated_at from grace_conversations
+    select id, title, created_at, updated_at, repo_owner, repo_name, repo_branch from grace_conversations
     where user_id = ${userId} order by updated_at desc limit 200`;
   return rows.map((row) => toConversation(row as unknown as Record<string, unknown>));
 }
@@ -304,7 +315,7 @@ export async function createConversation(userId: string, title = "New chat"): Pr
     const { data, error } = await supabase
       .from("grace_conversations")
       .insert({ user_id: userId, title })
-      .select("id, title, created_at, updated_at")
+      .select(CONVERSATION_COLUMNS)
       .single();
     if (error) throw new Error(error.message);
     return toConversation(data as Record<string, unknown>);
@@ -328,7 +339,7 @@ export async function getConversation(userId: string, id: string): Promise<Conve
   if (supabase) {
     const { data } = await supabase
       .from("grace_conversations")
-      .select("id, title, created_at, updated_at")
+      .select(CONVERSATION_COLUMNS)
       .eq("id", id)
       .eq("user_id", userId)
       .maybeSingle();
@@ -337,7 +348,7 @@ export async function getConversation(userId: string, id: string): Promise<Conve
   const sql = getSql();
   if (!sql) return null;
   const rows = await sql`
-    select id, title, created_at, updated_at from grace_conversations
+    select id, title, created_at, updated_at, repo_owner, repo_name, repo_branch from grace_conversations
     where id = ${id} and user_id = ${userId} limit 1`;
   return rows[0] ? toConversation(rows[0] as unknown as Record<string, unknown>) : null;
 }

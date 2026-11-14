@@ -42,8 +42,8 @@ export function AuthPanel() {
   };
 
   return (
-    <div className="w-full rounded-[28px] border border-hairline bg-surface p-5 shadow-[0_16px_40px_rgba(0,0,0,0.6)]">
-      <div className="mb-4 flex rounded-full bg-control p-1" role="tablist" aria-label="Account">
+    <div className="w-full rounded-[16px] border border-hairline bg-surface p-4 shadow-[0_16px_40px_rgba(0,0,0,0.55)]">
+      <div className="mb-3.5 flex rounded-[9px] bg-white/[0.04] p-0.5" role="tablist" aria-label="Account">
         {(
           [
             ["signup", "Create account"],
@@ -59,7 +59,7 @@ export function AuthPanel() {
               setMode(id);
               setError(null);
             }}
-            className={`h-10 flex-1 rounded-full text-[15px] font-bold transition-colors ${
+            className={`h-8 flex-1 rounded-[7px] text-[12.5px] font-semibold transition-colors ${
               mode === id ? "bg-ink text-black" : "text-sub hover:text-ink"
             }`}
           >
@@ -68,7 +68,7 @@ export function AuthPanel() {
         ))}
       </div>
 
-      <form onSubmit={submit} className="space-y-3" noValidate>
+      <form onSubmit={submit} className="space-y-2.5" noValidate>
         {mode === "signup" && (
           <Field
             label="Name"
@@ -89,7 +89,7 @@ export function AuthPanel() {
           required
         />
         <div>
-          <label htmlFor="password" className="mb-1.5 block text-[14px] font-bold text-sub">
+          <label htmlFor="password" className="mb-1 block text-[11.5px] font-medium text-sub">
             Password
           </label>
           <div className="relative">
@@ -101,12 +101,12 @@ export function AuthPanel() {
               autoComplete={mode === "signup" ? "new-password" : "current-password"}
               placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
               required
-              className="h-[52px] w-full rounded-[16px] border border-hairline bg-control px-4 pr-16 text-[17px] text-ink outline-none transition-colors placeholder:text-muted focus:border-accent"
+              className="h-10 w-full rounded-[9px] border border-hairline bg-control px-3 pr-14 text-[13px] text-ink outline-none transition-colors placeholder:text-muted focus:border-accent"
             />
             <button
               type="button"
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-2 top-1/2 h-9 -translate-y-1/2 rounded-full px-3 text-[13px] font-bold text-sub hover:text-ink"
+              className="absolute right-1.5 top-1/2 h-7 -translate-y-1/2 rounded-[6px] px-2 text-[11.5px] font-semibold text-sub hover:bg-white/[0.06] hover:text-ink"
             >
               {showPassword ? "Hide" : "Show"}
             </button>
@@ -114,7 +114,7 @@ export function AuthPanel() {
         </div>
 
         {error && (
-          <p role="alert" className="text-[14px] leading-5 text-[#F2A0A0]">
+          <p role="alert" className="text-[12px] leading-[18px] text-danger">
             {error}
           </p>
         )}
@@ -122,13 +122,13 @@ export function AuthPanel() {
         <button
           type="submit"
           disabled={busy}
-          className="h-[52px] w-full rounded-full bg-accent text-[18px] font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          className="press h-10 w-full rounded-[9px] bg-accent text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
         >
           {busy ? "One moment…" : mode === "signup" ? "Start with 250 credits" : "Sign in"}
         </button>
       </form>
 
-      <p className="mt-3 text-center text-[13px] leading-5 text-muted">
+      <p className="mt-2.5 text-center text-[11px] leading-4 text-muted">
         {mode === "signup"
           ? "Free to start. No card, no trial timer."
           : "Welcome back. Your chats are exactly where you left them."}
@@ -157,7 +157,7 @@ function Field({
   const id = label.toLowerCase();
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-[14px] font-bold text-sub">
+      <label htmlFor={id} className="mb-1 block text-[11.5px] font-medium text-sub">
         {label}
       </label>
       <input
@@ -168,7 +168,7 @@ function Field({
         placeholder={placeholder}
         autoComplete={autoComplete}
         required={required}
-        className="h-[52px] w-full rounded-[16px] border border-hairline bg-control px-4 text-[17px] text-ink outline-none transition-colors placeholder:text-muted focus:border-accent"
+        className="h-10 w-full rounded-[9px] border border-hairline bg-control px-3 text-[13px] text-ink outline-none transition-colors placeholder:text-muted focus:border-accent"
       />
     </div>
   );

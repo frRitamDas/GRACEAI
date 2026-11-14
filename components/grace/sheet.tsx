@@ -12,8 +12,8 @@ type Props = {
   open: boolean;
   onClose: () => void;
   children: ReactNode;
-  /** Center dialogs scale in; bottom sheets slide up. */
-  variant?: "center" | "bottom";
+  /** Center dialogs scale in; bottom sheets slide up; right is a side panel. */
+  variant?: "center" | "bottom" | "right";
   labelledBy?: string;
   className?: string;
   /** Skip the dimmer (used by the attach menu, which floats over the input). */
@@ -72,9 +72,16 @@ export function Overlay({
 
   if (!open) return null;
 
+  const shell =
+    variant === "center"
+      ? "grid place-items-center px-4"
+      : variant === "right"
+        ? "flex justify-end"
+        : "flex flex-col justify-end";
+
   return (
     <div
-      className={`fixed inset-0 z-50 ${variant === "center" ? "grid place-items-center px-4" : "flex flex-col justify-end"}`}
+      className={`fixed inset-0 z-50 ${shell}`}
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
@@ -91,7 +98,11 @@ export function Overlay({
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
-        className={`relative ${className}`}
+        className={`relative ${
+          variant === "right"
+            ? "animate-sheet-up h-full w-full max-w-[min(26rem,100vw)] border-l border-white/[0.07] bg-[#0c0c0f] sm:rounded-l-[16px]"
+            : ""
+        } ${className}`}
       >
         {children}
       </div>

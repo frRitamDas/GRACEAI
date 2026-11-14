@@ -23,6 +23,8 @@ const schema = z.object({
   projectId: z.string().min(1).max(64),
   message: z.string().trim().min(1).max(20_000),
   model: z.string().max(120).nullable().optional(),
+  /** File the user has open: the agent reads that one first. */
+  focus: z.string().max(400).nullable().optional(),
 });
 
 export async function POST(request: Request) {
@@ -75,6 +77,7 @@ export async function POST(request: Request) {
           history,
           prompt: body.message,
           preferredModel: body.model ?? user.model,
+          focus: body.focus ?? null,
           signal: request.signal,
         })) {
           if (event.type === "done") produced = true;

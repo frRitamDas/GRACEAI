@@ -10,22 +10,36 @@
 }
 
 /*
- * Grace design tokens — see DESIGN.md.
- * One accent color, flat black, no gradients.
+ * Grace design tokens.
+ *
+ * Dark, quiet, and built from a small ladder of surfaces rather than a single
+ * flat black. The rule that keeps it from looking muddy: every surface is one
+ * step lighter than the thing behind it, by a fixed amount, and nothing uses a
+ * border unless it also has a background difference. Hairlines are for edges
+ * that sit on top of content, not for drawing boxes around everything.
  */
 :root {
-  --color-bg: #000000;
-  --color-surface: #1c1c1e;
-  --color-surface-raised: #26262a;
-  --color-control: #1a1a1c;
-  --color-border: #2e2e32;
-  --color-text-primary: #ffffff;
-  --color-text-secondary: #9a9a9f;
-  --color-text-muted: #5c5c62;
-  --color-accent: #3b82f6;
-  --color-accent-soft: #1e2a44;
-  --color-accent-text: #7aa8ff;
-  --color-disabled: #3a3a3f;
+  /* Ladder: canvas → panel → field → hover. Each is visibly a step up. */
+  --color-bg: #08080a;
+  --color-panel: #0e0e11;
+  --color-surface: #131316;
+  --color-surface-raised: #1a1a1e;
+  --color-control: #17171b;
+  --color-border: #232327;
+  --color-border-strong: #313137;
+
+  --color-text-primary: #f5f5f7;
+  --color-text-secondary: #9d9da6;
+  --color-text-muted: #61616b;
+
+  --color-accent: #4c8dff;
+  --color-accent-soft: #1b2a47;
+  --color-accent-text: #8ab4ff;
+
+  --color-success: #3ecf8e;
+  --color-warning: #f0b757;
+  --color-danger: #ff5f57;
+  --color-disabled: #2b2b31;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -34,52 +48,60 @@
   --space-5: 24px;
   --space-6: 32px;
 
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
   --radius-pill: 999px;
-  --radius-menu: 24px;
-  --radius-modal: 28px;
-  --radius-card: 20px;
+  --radius-menu: 18px;
+  --radius-modal: 22px;
+  --radius-card: 16px;
 
-  /* Inter carries the UI; it reads cleaner than Roboto at every size and has
-     true variable weights, so the type scale stops looking uniform. Roboto
-     stays in the chain as DESIGN.md asks. */
   --font-family: "Inter Variable", "Roboto Variable", Roboto, system-ui,
     -apple-system, "Segoe UI", sans-serif;
   --font-display: "Inter Variable", "Roboto Variable", Roboto, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo,
     monospace;
 
-  /* Glass: one recipe, used everywhere a panel floats over the conversation.
-     Real backdrop blur is expensive on mobile GPUs, so it is applied to a
-     handful of large surfaces only, never to list rows. */
-  --glass-bg: rgba(22, 22, 25, 0.72);
-  --glass-strong-bg: rgba(18, 18, 21, 0.88);
-  --glass-border: rgba(255, 255, 255, 0.09);
-  --glass-highlight: rgba(255, 255, 255, 0.06);
-  --glass-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  /*
+   * Glass. Two recipes only, so the app reads as one material: `glass` for
+   * bars pinned to an edge, `glass-raised` for panels floating over content.
+   * Both are dark and low-contrast on purpose; the blur is there to keep the
+   * text under them legible, not to be noticed.
+   */
+  --glass-bg: rgba(14, 14, 17, 0.78);
+  --glass-raised-bg: rgba(19, 19, 22, 0.86);
+  --glass-border: rgba(255, 255, 255, 0.07);
+  --glass-border-strong: rgba(255, 255, 255, 0.11);
+  --glass-highlight: rgba(255, 255, 255, 0.045);
+  --glass-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
 
-  /* Motion: one easing curve and one duration scale, so everything in the app
-     moves like it belongs to the same product. */
+  /* Motion: one curve, one duration scale. */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
-  --dur-fast: 140ms;
-  --dur-base: 220ms;
-  --dur-slow: 320ms;
+  --ease-spring: cubic-bezier(0.34, 1.3, 0.64, 1);
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 260ms;
 
   color-scheme: dark;
 }
 
 @theme inline {
   --color-bg: var(--color-bg);
+  --color-panel: var(--color-panel);
   --color-surface: var(--color-surface);
   --color-raised: var(--color-surface-raised);
   --color-control: var(--color-control);
   --color-hairline: var(--color-border);
+  --color-hairline-strong: var(--color-border-strong);
   --color-ink: var(--color-text-primary);
   --color-sub: var(--color-text-secondary);
   --color-muted: var(--color-text-muted);
   --color-accent: var(--color-accent);
   --color-accent-soft: var(--color-accent-soft);
   --color-accent-text: var(--color-accent-text);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-danger: var(--color-danger);
   --color-disabled: var(--color-disabled);
 
   --font-sans: var(--font-family);
@@ -97,9 +119,8 @@
   }
 
   html {
-    background: #000;
+    background: var(--color-bg);
     height: 100%;
-    /* Keep the black canvas behind the translucent browser chrome. */
     color-scheme: dark;
   }
 
@@ -111,14 +132,12 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-feature-settings: "cv05" 1, "cv08" 1, "ss01" 1, "calt" 1;
-    letter-spacing: -0.011em;
+    font-feature-settings: "cv05" 1, "cv08" 1, "calt" 1;
+    letter-spacing: -0.008em;
     min-height: 100%;
     overscroll-behavior-y: none;
   }
 
-  /* Large text needs tighter tracking; small text needs none. This is what
-     makes the type scale read as designed rather than scaled. */
   h1,
   h2,
   h3 {
@@ -135,19 +154,18 @@
   kbd {
     font-family: var(--font-mono);
     font-feature-settings: "calt" 0;
+    letter-spacing: 0;
   }
 
-  /* The effort slider and other draggable surfaces must never select text. */
   [data-dragging="true"] {
     cursor: grabbing;
   }
 
   ::selection {
-    background: rgba(59, 130, 246, 0.35);
+    background: rgba(76, 141, 255, 0.3);
     color: #fff;
   }
 
-  /* Visible 2px accent focus ring on keyboard navigation (DESIGN.md §9). */
   :focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
@@ -166,18 +184,24 @@
   }
 }
 
-/* Thin, quiet scrollbars so the chat area stays calm. */
 @layer utilities {
   .scroll-quiet {
     scrollbar-width: thin;
     scrollbar-color: var(--color-border) transparent;
   }
   .scroll-quiet::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
+    height: 8px;
   }
   .scroll-quiet::-webkit-scrollbar-thumb {
     background: var(--color-border);
     border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .scroll-quiet::-webkit-scrollbar-thumb:hover {
+    background: var(--color-border-strong);
+    background-clip: content-box;
   }
   .scroll-quiet::-webkit-scrollbar-track {
     background: transparent;
@@ -188,43 +212,67 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
-  /* The floating surface: a hairline, a soft top highlight, real blur. */
+
+  /* Edge bars: blur, one hairline on the inner side, no drop shadow. */
   .glass {
     background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
-    backdrop-filter: blur(28px) saturate(180%);
-    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
   }
 
+  /* Floating panels: stronger blur, a hairline, one soft shadow. */
+  .glass-raised {
+    background: var(--glass-raised-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+    backdrop-filter: blur(32px) saturate(160%);
+    -webkit-backdrop-filter: blur(32px) saturate(160%);
+  }
+
+  /* Legacy aliases so older surfaces keep one visual language. */
   .glass-strong {
-    background: var(--glass-strong-bg);
+    background: var(--glass-raised-bg);
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
-    backdrop-filter: blur(40px) saturate(180%);
-    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    backdrop-filter: blur(32px) saturate(160%);
+    -webkit-backdrop-filter: blur(32px) saturate(160%);
   }
 
-  /* Bars pinned to an edge: blur, no shadow, one hairline on the inner side. */
   .glass-bar {
-    background: rgba(10, 10, 12, 0.72);
-    backdrop-filter: blur(20px) saturate(160%);
-    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    background: var(--glass-bg);
+    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
   }
 
-  /* Browsers without backdrop-filter get an opaque panel rather than a
-     translucent smear that makes text unreadable. */
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .glass,
-    .glass-strong {
-      background: #16161a;
-    }
+    .glass-raised,
+    .glass-strong,
     .glass-bar {
-      background: #0a0a0c;
+      background: var(--color-panel);
     }
   }
 
-  /* Softer, smaller elevation for hoverable cards. */
+  /*
+   * The app's single interactive surface recipe. Every clickable card, row and
+   * menu item uses `.surface` plus one of the state modifiers, so hover feels
+   * identical everywhere instead of eleven slightly different transitions.
+   */
+  .surface {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    transition:
+      background-color var(--dur-fast) ease,
+      border-color var(--dur-fast) ease,
+      color var(--dur-fast) ease;
+  }
+
+  .surface-hover:hover {
+    background: var(--color-surface-raised);
+    border-color: var(--color-border-strong);
+  }
+
   .lift {
     transition:
       transform var(--dur-base) var(--ease-out),
@@ -234,7 +282,39 @@
 
   .lift:hover {
     transform: translateY(-1px);
-    border-color: rgba(255, 255, 255, 0.16);
+    border-color: var(--color-border-strong);
+  }
+
+  /* Loading placeholders: a flat block with a slow sheen, never a spinner. */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--color-surface);
+    border-radius: 6px;
+  }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.045),
+      transparent
+    );
+    animation: grace-sheen 1.6s ease-in-out infinite;
+  }
+
+  /* A 1px divider that reads as an edge, never as a box. */
+  .divider {
+    border-color: var(--color-border);
+  }
+
+  /* Focus ring for compound widgets that manage their own focus. */
+  .ring-accent:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-accent);
   }
 
   .safe-top {
@@ -243,16 +323,30 @@
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+
+  /* Subtle top-to-bottom wash behind the conversation, so the composer does
+     not float on pure black. */
+  .canvas-wash {
+    background:
+      radial-gradient(120% 80% at 50% 0%, rgba(76, 141, 255, 0.055) 0%, transparent 60%),
+      var(--color-bg);
+  }
 }
 
 /* ------------------------------------------------------------------ */
-/* Motion (DESIGN.md §7). One fade-up on the greeting, 200ms sheets,   */
-/* 200ms modal scale. Reduced motion keeps fades only.                */
+/* Motion. One fade-up, one sheet, one modal. Reduced motion keeps a   */
+/* fade and drops everything that moves.                               */
 /* ------------------------------------------------------------------ */
+@keyframes grace-sheen {
+  to {
+    transform: translateX(100%);
+  }
+}
+
 @keyframes grace-fade-up {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -272,7 +366,7 @@
 @keyframes grace-sheet-up {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -283,7 +377,7 @@
 @keyframes grace-modal-in {
   from {
     opacity: 0;
-    transform: scale(0.96);
+    transform: scale(0.97);
   }
   to {
     opacity: 1;
@@ -291,47 +385,45 @@
   }
 }
 
-@keyframes grace-caret-blink {
+@keyframes grace-pulse {
   0%,
-  70% {
-    opacity: 1;
-  }
-  71%,
   100% {
-    opacity: 0.15;
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
   }
 }
 
 .animate-fade-up {
-  animation: grace-fade-up 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-.animate-fade-in {
-  animation: grace-fade-in 180ms ease-out both;
-}
-.animate-sheet-up {
-  animation: grace-sheet-up 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-.animate-modal-in {
-  animation: grace-modal-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-
-/* Lists that arrive one row at a time read as assembling rather than
-   appearing. Capped so a long list is never slow to use. */
-.stagger > * {
   animation: grace-fade-up 260ms var(--ease-out) both;
 }
-.stagger > *:nth-child(1) { animation-delay: 0ms; }
-.stagger > *:nth-child(2) { animation-delay: 22ms; }
-.stagger > *:nth-child(3) { animation-delay: 44ms; }
-.stagger > *:nth-child(4) { animation-delay: 66ms; }
-.stagger > *:nth-child(5) { animation-delay: 88ms; }
-.stagger > *:nth-child(6) { animation-delay: 110ms; }
-.stagger > *:nth-child(7) { animation-delay: 132ms; }
-.stagger > *:nth-child(8) { animation-delay: 154ms; }
-.stagger > *:nth-child(n + 9) { animation-delay: 176ms; }
+.animate-fade-in {
+  animation: grace-fade-in 160ms ease-out both;
+}
+.animate-sheet-up {
+  animation: grace-sheet-up 180ms var(--ease-out) both;
+}
+.animate-modal-in {
+  animation: grace-modal-in 180ms var(--ease-out) both;
+}
+.animate-pulse-soft {
+  animation: grace-pulse 1.6s ease-in-out infinite;
+}
 
-/* Shared hover lift for interactive cards, so buttons across the app respond
-   at the same speed with the same curve. */
+.stagger > * {
+  animation: grace-fade-up 240ms var(--ease-out) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 18ms; }
+.stagger > *:nth-child(3) { animation-delay: 36ms; }
+.stagger > *:nth-child(4) { animation-delay: 54ms; }
+.stagger > *:nth-child(5) { animation-delay: 72ms; }
+.stagger > *:nth-child(6) { animation-delay: 90ms; }
+.stagger > *:nth-child(7) { animation-delay: 108ms; }
+.stagger > *:nth-child(8) { animation-delay: 126ms; }
+.stagger > *:nth-child(n + 9) { animation-delay: 144ms; }
+
 .press {
   transition:
     transform var(--dur-fast) var(--ease-out),
@@ -349,6 +441,9 @@
   .animate-modal-in,
   .stagger > * {
     animation: grace-fade-in 1ms linear both;
+  }
+  .animate-pulse-soft {
+    animation: none;
   }
   .press:active {
     transform: none;

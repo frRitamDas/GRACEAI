@@ -13,6 +13,7 @@ import { cachedCatalog, storeCatalog } from "@/lib/ai/catalog-cache";
 import { loadCatalog } from "@/lib/ai/discovery";
 import { getProviderKey } from "@/lib/ai/env";
 import { streamChat, type ChatTurn } from "@/lib/ai/chat";
+import { codingSystemPrompt, extractFileBlocks } from "@/lib/ai/coding";
 
 /**
  * Grace Code: projects, and the rules the agent works under.
@@ -481,39 +482,24 @@ export async function addMessage(input: {
  * is told to keep existing code working, to say when it is unsure, and never to
  * claim it ran anything — it cannot.
  */
-function systemPrompt(project: Project, files: ProjectFile[]): string {
-  const manifest = files
-    .map((f) => `- ${f.path} (${f.content.split("\n").length} lines)`)
-    .join("\n");
-
-  return [
-    `You are Grace Code, a coding partner working inside the project "${project.name}" (${project.language}).`,
-    "",
-    "You can read every file in the project. You cannot execute anything, and you never claim you did.",
-    "",
-    "## How to write code back",
-    "When you change or create a file, answer with a fenced block whose language tag is the file path, like this:",
-    "",
-    "```path/to/file.js",
-    "<the complete new contents of the file>",
-    "```",
-    "",
-    "Rules for those blocks:",
-    "- Always send the whole file. A block replaces the file, it does not patch it.",
-    "- Use paths exactly as they appear in the file list. New files need a sensible path.",
-    "- Only include a block for files you are actually changing.",
-    "- Put your explanation outside the blocks, in plain prose. Keep it short and specific.",
-    "- If a change is risky or you are guessing, say so in prose before the block.",
-    "",
-    "## Project files",
-    manifest || "(no files yet)",
-    "",
-    project.instructions.trim()
-      ? `## Project instructions\n${project.instructions.trim()}`
-      : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
+/**
+ * Grace Code's turn prompt. The doctrine lives in `lib/ai/coding` so the chat
+ * workspace and this app give the same answers to "how do you work".
+ */
+function systemPrompt(project: Project, files: ProjectFile[], focus?: string | null): string {
+  return codingSystemPrompt({
+    projectName: project.name,
+    language: project.language,
+    files: files.map((f) => ({ path: f.path, content: f.content })),
+    instructions: project.instructions,
+    focus: focus ?? null,
+    context: project.repo
+      ? `This project is linked to GitHub \`${project.repo.owner}/${project.repo.name}\` on branch \`${project.repo.branch}\`. Changes you write are local until the user pushes them; say so if a task would need a commit.`
+      : undefined,
+    // Grace Code shows whole files in an editor, so it can afford more context
+    // than a chat turn where the reply has to stay readable.
+    maxChars: 160_000,
+  });
 }
 
 /**
@@ -523,33 +509,21 @@ function systemPrompt(project: Project, files: ProjectFile[]): string {
  * unterminated block still counts, and a tag that looks like a path is enough.
  * The text left behind is what the user reads as the explanation.
  */
-export function extractPatches(reply: string, known: string[]): {
-  text: string;
-  patches: { path: string; content: string }[];
-} {
-  const patches: { path: string; content: string }[] = [];
-  const knownSet = new Set(known);
-
-  const fence = /```([^\n`]*)\n([\s\S]*?)(?:\n```|$)/g;
-  let match: RegExpExecArray | null;
-  let text = reply;
-
-  while ((match = fence.exec(reply)) !== null) {
-    const tag = match[1].trim();
-    const body = match[2].replace(/\n$/, "");
-    // A language tag like `js` or `python` is an illustration, not a file.
-    const looksLikePath = /[/.]/.test(tag) || knownSet.has(tag);
-    if (!looksLikePath) continue;
-    const path = safePath(tag);
-    if (!path) continue;
-    patches.push({ path, content: body });
-    text = text.replace(match[0], "");
-  }
-
-  return { text: text.replace(/\n{3,}/g, "\n\n").trim(), patches };
+export function extractPatches(
+  reply: string,
+  known: string[]
+): { text: string; patches: { path: string; content: string }[] } {
+  // Delegated: the chat workspace applies the same blocks, so there is one
+  // parser to keep correct rather than two that drift apart.
+  const { text, patches } = extractFileBlocks(reply, known);
+  return {
+    text,
+    patches: patches
+      .map((p) => ({ path: safePath(p.path) ?? "", content: p.content }))
+      .filter((p) => p.path.length > 0) as { path: string; content: string }[],
+  };
 }
 
-/** Resolves which model a code turn should use, honouring the owner's overrides. */
 async function pickCodeModel(preferred: string | null): Promise<{ model: ModelDef; key: string } | null> {
   const cached = cachedCatalog();
   const catalog = cached ?? (await (async () => {
@@ -598,9 +572,11 @@ export async function* runCodeTurn(options: {
   history: CodeMessage[];
   prompt: string;
   preferredModel: string | null;
+  /** File the user is looking at, so the agent reads it first. */
+  focus?: string | null;
   signal?: AbortSignal;
 }): AsyncGenerator<CodeStreamEvent> {
-  const { project, files, history, prompt, preferredModel, signal } = options;
+  const { project, files, history, prompt, preferredModel, focus, signal } = options;
 
   const picked = await pickCodeModel(preferredModel);
   if (!picked) {
@@ -613,8 +589,7 @@ export async function* runCodeTurn(options: {
   }
 
   const turns: ChatTurn[] = [
-    { role: "system", content: systemPrompt(project, files) },
-    ...history.slice(-12).map((m) => ({ role: m.role, content: m.content })),
+    ...history.slice(-20).map((m) => ({ role: m.role, content: m.content })),
     { role: "user", content: prompt },
   ];
 
@@ -624,9 +599,11 @@ export async function* runCodeTurn(options: {
   for await (const event of streamChat({
     key: picked.key,
     model: picked.model,
-    effortIndex: 2,
+    // Coding is reasoning work: never run the cheapest effort level for it.
+    effortIndex: 3,
     turns,
     attachments: [],
+    systemPrompt: systemPrompt(project, files, focus),
     signal,
   })) {
     if (event.type === "status") yield { type: "status", label: event.label };

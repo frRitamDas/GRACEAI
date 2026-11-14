@@ -35,7 +35,7 @@ export function Drawer({
 }: Props) {
   return (
     <Overlay open={open} onClose={onClose} variant="bottom" labelledBy="drawer-title" transparent>
-      <div className="absolute inset-0 bg-black/60" aria-hidden="true" onMouseDown={onClose} />
+      <div className="absolute inset-0 bg-black/70" aria-hidden="true" onMouseDown={onClose} />
       <div className="animate-sheet-up relative flex h-[86vh] w-full flex-col overflow-hidden rounded-t-[28px] border-t border-hairline glass-strong pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-start justify-between gap-3 px-5 pb-2 pt-5">
           <div className="min-w-0">

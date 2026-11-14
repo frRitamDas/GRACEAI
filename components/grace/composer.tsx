@@ -16,18 +16,32 @@ type Props = {
   onOpenEffort: () => void;
   onOpenModels: () => void;
   effortLabel: string;
+  /** Short label for the current model, e.g. "Nemotron 3 Ultra". */
+  modelLabel: string;
+  /** Code mode. Present only when a workspace can exist for this chat. */
+  codeMode?: {
+    enabled: boolean;
+    onToggle: () => void;
+    /** "owner/repo" or a file count, shown inside the pill when on. */
+    detail: string | null;
+  };
   deepResearchOn: boolean;
   onToggleDeepResearch: () => void;
   attachments: { id: string; name: string }[];
   onRemoveAttachment: (id: string) => void;
   menuOpen: boolean;
   onMenuOpenChange: (open: boolean) => void;
+  /** Lets the empty state drop the caret into the box after a starter. */
+  inputRef?: React.RefObject<HTMLTextAreaElement | null>;
 };
 
 /**
- * Input bar (DESIGN.md §6.3). Plus button, growing field, gauge, mic and a
- * 56px send circle that is disabled until there is text. Mic hides while
- * typing; the send button turns into a stop control while streaming.
+ * The input bar.
+ *
+ * Laid out as one control strip: attach on the left, the field in the middle,
+ * and a cluster of three quiet icon buttons plus send on the right. The model
+ * name replaces the old anonymous stack icon, because "which model am I talking
+ * to" is the question that button answers and a glyph cannot say it.
  */
 export function Composer({
   value,
@@ -39,36 +53,41 @@ export function Composer({
   onTakePhoto,
   onOpenEffort,
   onOpenModels,
-  effortLabel,
+  modelLabel,
+  codeMode,
   deepResearchOn,
   onToggleDeepResearch,
   attachments,
   onRemoveAttachment,
   menuOpen,
   onMenuOpenChange,
+  inputRef,
 }: Props) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const ownRef = useRef<HTMLTextAreaElement>(null);
+  // The caller may own the ref (so a starter card can focus the box); both refs
+  // are stable, so the derived one is too, and it is safe to depend on.
+  const textareaRef = inputRef ?? ownRef;
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
 
   const hasText = value.trim().length > 0;
-  const typing = hasText && !sending;
+  const codeOn = codeMode?.enabled ?? false;
 
-  // Grow to five lines, then scroll (DESIGN.md §6.3).
+  // Grow to five lines, then scroll.
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "0px";
-    const line = 26;
-    const max = line * 5 + 20;
+    const line = 24;
+    const max = line * 5 + 18;
     el.style.height = `${Math.min(el.scrollHeight, max)}px`;
-  }, [value]);
+  }, [value, textareaRef]);
 
   useEffect(() => {
     if (sending) return;
     textareaRef.current?.focus({ preventScroll: true });
-  }, [sending]);
+  }, [sending, textareaRef]);
 
   const startVoice = () => {
     type SpeechCtor = new () => {
@@ -124,173 +143,206 @@ export function Composer({
         </p>
       )}
 
-      <div className="glass relative flex items-start gap-0.5 rounded-[28px] px-1 py-2 transition-colors duration-200 focus-within:border-white/20 sm:px-1.5">
-        <AttachMenu
-          open={menuOpen}
-          onClose={() => onMenuOpenChange(false)}
-          onAttachFiles={() => {
-            onMenuOpenChange(false);
-            onAttachFiles();
+      <div
+        className={`glass-raised relative rounded-[22px] transition-colors duration-150 ${
+          codeOn ? "ring-1 ring-accent/25" : ""
+        }`}
+      >
+        {attachments.length > 0 && (
+          <ul className="flex flex-wrap gap-1.5 px-3 pt-2.5">
+            {attachments.map((file) => (
+              <li
+                key={file.id}
+                className="flex max-w-[220px] items-center gap-1 rounded-[8px] border border-white/[0.07] bg-white/[0.03] py-1 pl-2 pr-1 text-[12px] text-sub"
+              >
+                <span className="truncate">{file.name}</span>
+                <button
+                  type="button"
+                  onClick={() => onRemoveAttachment(file.id)}
+                  aria-label={`Remove ${file.name}`}
+                  className="grid h-4 w-4 place-items-center rounded-full text-muted hover:bg-white/10 hover:text-ink"
+                >
+                  <X size={10} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <label htmlFor="grace-input" className="sr-only">
+          Ask Grace
+        </label>
+        <textarea
+          id="grace-input"
+          ref={textareaRef}
+          value={value}
+          rows={1}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              if (hasText && !sending) onSend();
+            }
           }}
-          onTakePhoto={() => {
-            onMenuOpenChange(false);
-            onTakePhoto();
-          }}
-          onDeepResearch={() => {
-            onMenuOpenChange(false);
-            onToggleDeepResearch();
-          }}
-          deepResearchOn={deepResearchOn}
+          placeholder={codeOn ? "Ask Grace to change the code…" : "Ask Grace"}
+          enterKeyHint="send"
+          className="scroll-quiet block w-full resize-none bg-transparent px-3.5 pt-3 text-[15.5px] leading-[24px] tracking-[-0.011em] text-ink outline-none placeholder:text-muted sm:text-[16px]"
+          style={{ maxHeight: 148 }}
         />
 
-        <button
-          type="button"
-          onClick={() => onMenuOpenChange(!menuOpen)}
-          aria-label={menuOpen ? "Close attach menu" : "Add attachment"}
-          aria-expanded={menuOpen}
-          className="grid h-11 w-9 shrink-0 place-items-center rounded-full text-ink transition-colors hover:bg-raised active:scale-95 sm:w-10"
-        >
-          {menuOpen ? <X size={22} /> : <Plus size={24} strokeWidth={2} aria-hidden="true" />}
-        </button>
-
-        <div className="min-w-0 flex-1 py-2.5">
-          {attachments.length > 0 && (
-            <ul className="mb-1.5 flex flex-wrap gap-1.5">
-              {attachments.map((file) => (
-                <li
-                  key={file.id}
-                  className="flex max-w-[200px] items-center gap-1 rounded-full border border-hairline bg-control py-1 pl-2.5 pr-1 text-[13px] text-sub"
-                >
-                  <span className="truncate">{file.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => onRemoveAttachment(file.id)}
-                    aria-label={`Remove ${file.name}`}
-                    className="grid h-5 w-5 place-items-center rounded-full hover:bg-raised hover:text-ink"
-                  >
-                    <X size={12} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <label htmlFor="grace-input" className="sr-only">
-            Ask Grace
-          </label>
-          <textarea
-            id="grace-input"
-            ref={textareaRef}
-            value={value}
-            rows={1}
-            onChange={(event) => onChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                if (hasText && !sending) onSend();
-              }
+        {/* ------------------------------------------------------- toolbar */}
+        <div className="flex items-center gap-1 px-2 pb-2 pt-1">
+          <AttachMenu
+            open={menuOpen}
+            onClose={() => onMenuOpenChange(false)}
+            onAttachFiles={() => {
+              onMenuOpenChange(false);
+              onAttachFiles();
             }}
-            placeholder="Ask Grace"
-            enterKeyHint="send"
-            className="scroll-quiet block w-full resize-none bg-transparent text-[16px] leading-[26px] tracking-[-0.011em] text-ink outline-none placeholder:text-muted sm:text-[17px]"
-            style={{ maxHeight: 150 }}
+            onTakePhoto={() => {
+              onMenuOpenChange(false);
+              onTakePhoto();
+            }}
+            onDeepResearch={() => {
+              onMenuOpenChange(false);
+              onToggleDeepResearch();
+            }}
+            deepResearchOn={deepResearchOn}
           />
-          {/* Desktop affordance: nobody discovers Shift+Enter by guessing. */}
-          <p className="hidden select-none pb-0.5 text-[11px] leading-3 text-muted/70 lg:block">
-            {hasText ? "Enter to send · Shift+Enter for a new line" : "\u00a0"}
-          </p>
-        </div>
+          <button
+            type="button"
+            onClick={() => onMenuOpenChange(!menuOpen)}
+            aria-label={menuOpen ? "Close attach menu" : "Add a file or search"}
+            aria-expanded={menuOpen}
+            className={`press grid h-8 w-8 shrink-0 place-items-center rounded-[9px] ${
+              menuOpen
+                ? "bg-white/[0.08] text-ink"
+                : "text-sub hover:bg-white/[0.06] hover:text-ink"
+            }`}
+          >
+            {menuOpen ? <X size={17} /> : <Plus size={18} strokeWidth={2.2} aria-hidden="true" />}
+          </button>
 
-        <div className="flex shrink-0 items-center">
+          {codeMode && (
+            <button
+              type="button"
+              onClick={codeMode.onToggle}
+              aria-pressed={codeMode.enabled}
+              title={
+                codeMode.enabled
+                  ? `Code mode is on${codeMode.detail ? ` · ${codeMode.detail}` : ""}`
+                  : "Let Grace read and change code in this chat"
+              }
+              className={`press flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-medium ${
+                codeMode.enabled
+                  ? "border-accent/40 bg-accent-soft text-accent-text"
+                  : "border-white/[0.07] text-sub hover:border-white/[0.14] hover:text-ink"
+              }`}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="m8 6-5 6 5 6M16 6l5 6-5 6"
+                  stroke="currentColor"
+                  strokeWidth="2.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Code
+              <span
+                aria-hidden="true"
+                className={`ml-0.5 h-1.5 w-1.5 rounded-full ${
+                  codeMode.enabled ? "bg-accent" : "bg-white/20"
+                }`}
+              />
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onOpenModels}
-            aria-label="Choose a model"
             title="Choose a model"
-            className="grid h-11 w-9 place-items-center rounded-full text-sub transition-colors hover:bg-raised hover:text-ink sm:w-10"
+            className="press flex h-8 min-w-0 max-w-[38vw] items-center gap-1.5 rounded-full px-2 text-[12px] text-sub hover:bg-white/[0.06] hover:text-ink sm:max-w-[220px]"
           >
-            <ModelIcon />
+            <span className="truncate">{modelLabel}</span>
+            <Chevron />
           </button>
 
-          <button
-            type="button"
-            onClick={onOpenEffort}
-            aria-label={`Effort: ${effortLabel}. Change effort`}
-            className="group grid h-11 w-9 place-items-center rounded-full transition-colors hover:bg-raised sm:w-10"
-          >
-            <GaugeIcon />
-          </button>
+          <div className="ml-auto flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={onOpenEffort}
+              aria-label="Change effort"
+              title="Effort"
+              className="press grid h-8 w-8 place-items-center rounded-[9px] text-sub hover:bg-white/[0.06] hover:text-ink"
+            >
+              <GaugeIcon />
+            </button>
 
-          {!typing && !sending && (
-            <button
-              type="button"
-              onClick={startVoice}
-              aria-label={listening ? "Stop voice input" : "Start voice input"}
-              aria-pressed={listening}
-              className={`grid h-11 w-10 place-items-center rounded-full transition-colors hover:bg-raised sm:w-11 ${
-                listening ? "text-accent" : "text-ink"
-              }`}
-            >
-              <Mic size={22} aria-hidden="true" />
-            </button>
-          )}
+            {!hasText && !sending && (
+              <button
+                type="button"
+                onClick={startVoice}
+                aria-label={listening ? "Stop voice input" : "Start voice input"}
+                aria-pressed={listening}
+                className={`press grid h-8 w-8 place-items-center rounded-[9px] hover:bg-white/[0.06] ${
+                  listening ? "text-accent" : "text-sub hover:text-ink"
+                }`}
+              >
+                <Mic size={17} aria-hidden="true" />
+              </button>
+            )}
 
-          {sending ? (
-            <button
-              type="button"
-              onClick={onStop}
-              aria-label="Stop generating"
-              className="grid h-11 w-11 place-items-center rounded-full bg-ink text-black transition-opacity hover:opacity-90"
-            >
-              <Square size={16} fill="currentColor" aria-hidden="true" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onSend}
-              disabled={!hasText}
-              aria-label="Send message"
-              className={`grid h-11 w-11 place-items-center rounded-full transition-all duration-150 ${
-                hasText
-                  ? "bg-ink text-black hover:opacity-90 active:scale-95"
-                  : "bg-disabled text-muted"
-              }`}
-            >
-              <ArrowUp size={22} strokeWidth={2.4} aria-hidden="true" />
-            </button>
-          )}
+            {sending ? (
+              <button
+                type="button"
+                onClick={onStop}
+                aria-label="Stop generating"
+                className="press ml-0.5 grid h-8 w-8 place-items-center rounded-full bg-ink text-black"
+              >
+                <Square size={12} fill="currentColor" aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onSend}
+                disabled={!hasText}
+                aria-label="Send message"
+                className={`press ml-0.5 grid h-8 w-8 place-items-center rounded-full ${
+                  hasText
+                    ? "bg-ink text-black hover:opacity-90"
+                    : "bg-white/[0.07] text-muted"
+                }`}
+              >
+                <ArrowUp size={17} strokeWidth={2.6} aria-hidden="true" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-/** A stack glyph that opens the frontier model list. */
-function ModelIcon() {
+function Chevron() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M12 3 3 7.5l9 4.5 9-4.5L12 3Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-      <path d="m3 12.5 9 4.5 9-4.5" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-      <path d="m3 17 9 4.5 9-4.5" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" opacity=".5" />
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0 opacity-60">
+      <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
-/** The small blue gauge from the reference input bar. */
+/** The small blue gauge that opens effort. */
 function GaugeIcon() {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
         d="M4 17a8.5 8.5 0 1 1 16 0"
         stroke="var(--color-accent)"
         strokeWidth="2.4"
         strokeLinecap="round"
       />
-      <path
-        d="M12 17l3.6-5"
-        stroke="var(--color-accent)"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-      />
+      <path d="M12 17l3.6-5" stroke="var(--color-accent)" strokeWidth="2.4" strokeLinecap="round" />
       <circle cx="12" cy="17" r="1.6" fill="var(--color-accent)" />
     </svg>
   );

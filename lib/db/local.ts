@@ -38,6 +38,19 @@ export type LocalConversation = {
   title: string;
   created_at: string;
   updated_at: string;
+  /** Present when this conversation is attached to a GitHub repository. */
+  repo_owner?: string | null;
+  repo_name?: string | null;
+  repo_branch?: string | null;
+};
+
+/** A file attached to a chat workspace (not a Grace Code project). */
+export type LocalWorkspaceFile = {
+  conversation_id: string;
+  path: string;
+  content: string;
+  sha?: string | null;
+  updated_at: string;
 };
 
 export type LocalMessage = {
@@ -95,6 +108,8 @@ export type LocalDb = {
     free: boolean;
     updated_at: string;
   }[];
+  /** Files attached to a conversation's workspace (chat-side coding). */
+  workspaceFiles: LocalWorkspaceFile[];
   codeProjects: {
     id: string;
     user_id: string;
@@ -154,6 +169,7 @@ const EMPTY: LocalDb = {
   usage: [],
   providerKeys: [],
   modelOverrides: [],
+  workspaceFiles: [],
   codeProjects: [],
   codeFiles: [],
   codeMessages: [],

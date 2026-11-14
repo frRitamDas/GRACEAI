@@ -271,6 +271,11 @@ export function ModelSheet({
                             Free
                           </span>
                         )}
+                        {/* Say why a row cannot be picked, rather than letting it
+                            look broken when it is silently disabled. */}
+                        {!model.available && anyConfigured && (
+                          <span className="shrink-0 text-[11px] text-muted">no key</span>
+                        )}
                       </span>
                       <span className="mt-0.5 flex items-center gap-1.5 text-[12px] leading-4 text-muted">
                         <span>{model.providerLabel}</span>

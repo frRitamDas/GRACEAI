@@ -17,40 +17,41 @@ export function Landing({ providers }: { providers: { label: string; configured:
   }));
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] w-full max-w-[960px] flex-col px-4 pb-16">
-      <header className="flex items-center justify-between py-4">
-        <div className="flex items-center gap-2.5">
-          <span className="grid h-11 w-11 place-items-center rounded-full border border-hairline bg-control text-[#C9C9CC]">
-            <GraceMark className="h-6 w-6" />
+    <div className="canvas-wash mx-auto flex min-h-[100dvh] w-full flex-col pb-16">
+      <header className="mx-auto flex w-full max-w-[1040px] items-center justify-between px-4 py-4 sm:px-6">
+        <div className="flex items-center gap-2">
+          <span className="grid h-8 w-8 place-items-center rounded-[8px] border border-white/[0.08] bg-white/[0.04]">
+            <GraceMark className="h-[18px] w-[18px]" />
           </span>
-          <span className="font-display text-[18px] font-semibold tracking-[-0.02em] text-ink">Grace</span>
+          <span className="text-[14px] font-semibold tracking-[-0.01em] text-ink">Grace</span>
         </div>
         <a
           href="#start"
-          className="h-11 rounded-full border border-hairline bg-control px-4 text-[15px] font-semibold leading-[44px] text-ink transition-colors duration-150 hover:border-[#3A3A3F] hover:text-ink"
+          className="press flex h-8 items-center rounded-[7px] bg-ink px-3 text-[12.5px] font-semibold text-black"
         >
           Start
         </a>
       </header>
 
-      <main className="grid flex-1 items-start gap-10 pt-6 lg:grid-cols-[1.15fr_0.85fr] lg:gap-14 lg:pt-12">
+      <div className="mx-auto w-full max-w-[1040px]">
+      <main className="grid flex-1 items-start gap-10 px-4 pt-8 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:gap-12 lg:pt-14">
         <div>
-          <h1 className="animate-fade-up max-w-[16ch] font-display text-[40px] font-semibold leading-[44px] tracking-[-0.032em] text-ink sm:text-[56px] sm:leading-[60px]">
+          <h1 className="animate-fade-up max-w-[15ch] text-[34px] font-semibold leading-[38px] tracking-[-0.035em] text-ink sm:text-[52px] sm:leading-[54px]">
             Ask Grace. Keep it clear.
           </h1>
-          <p className="mt-5 max-w-[46ch] text-[17px] leading-[27px] text-sub">
+          <p className="mt-4 max-w-[44ch] text-[14.5px] leading-[23px] text-sub">
             A quiet AI workspace with frontier models behind one input. Choose how hard Grace
             should think, from instant answers to deep work, and see exactly what each answer
             costs.
           </p>
 
-          <div className="mt-8 grid gap-3 sm:grid-cols-3">
+          <div className="mt-6 grid gap-2 sm:grid-cols-3">
             <Point title="Effort you set" body="Instant, Quick, Balanced, Deep, Ultra. One slider, no guesswork." />
             <Point title="Models you choose" body="Claude, GPT, Gemini, Kimi, Llama and more, overridable per chat." />
             <Point title="Credits you see" body="Every answer shows its cost and what is left this month." />
           </div>
 
-          <section className="mt-10" aria-labelledby="providers-heading">
+          <section className="mt-8" aria-labelledby="providers-heading">
             <h2 id="providers-heading" className="text-[13px] font-semibold tracking-[0.01em] text-muted">
               {byProvider.some((p) => p.configured) ? "Provider access" : "Providers, once keys are added"}
             </h2>
@@ -60,22 +61,22 @@ export function Landing({ providers }: { providers: { label: string; configured:
                 Studio key is added.
               </p>
             )}
-            <ul className="mt-3 grid gap-3 sm:grid-cols-3">
+            <ul className="mt-2.5 grid gap-2 sm:grid-cols-3">
               {byProvider.map((provider) => (
-                <li key={provider.id} className="rounded-[20px] border border-hairline bg-surface p-4">
-                  <p className="flex items-center justify-between gap-2 text-[16px] font-bold text-ink">
+                <li key={provider.id} className="rounded-[12px] border border-hairline bg-surface p-3">
+                  <p className="flex items-center justify-between gap-2 text-[12.5px] font-semibold text-ink">
                     {provider.label}
                     <span
-                      className={`h-2 w-2 rounded-full ${provider.configured ? "bg-accent" : "bg-[#3A3A3F]"}`}
+                      className={`h-2 w-2 rounded-full ${provider.configured ? "bg-accent" : "bg-hairline-strong"}`}
                       aria-label={provider.configured ? "Connected" : "Key needed"}
                     />
                   </p>
-                  <p className="mt-1 text-[13px] leading-5 text-sub">
-                    {provider.count} frontier {provider.count === 1 ? "model" : "models"}
+                  <p className="mt-0.5 text-[11px] leading-4 text-muted">
+                    {provider.count} {provider.count === 1 ? "model" : "models"}
                   </p>
                   <ul className="mt-2 space-y-0.5">
                     {provider.models.map((model) => (
-                      <li key={model.id} className="truncate text-[13px] text-muted">
+                      <li key={model.id} className="truncate text-[11.5px] text-sub">
                         {model.name}
                       </li>
                     ))}
@@ -108,20 +109,22 @@ export function Landing({ providers }: { providers: { label: string; configured:
 
         <div id="start" className="lg:sticky lg:top-8">
           <AuthPanel />
-          <p className="mt-4 text-center text-[13px] leading-5 text-muted">
+          <p className="mt-3 text-center text-[11px] leading-4 text-muted">
             Grace can make mistakes. Check anything important.
           </p>
         </div>
       </main>
+      </div>
     </div>
   );
 }
 
+/** One promise, stated plainly: a small heading and the sentence that backs it. */
 function Point({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-[20px] border border-hairline bg-surface p-4">
-      <p className="text-[16px] font-bold text-ink">{title}</p>
-      <p className="mt-1 text-[14px] leading-5 text-sub">{body}</p>
+    <div className="rounded-[12px] border border-hairline bg-surface p-3">
+      <p className="text-[12.5px] font-semibold text-ink">{title}</p>
+      <p className="mt-0.5 text-[11.5px] leading-[17px] text-muted">{body}</p>
     </div>
   );
 }

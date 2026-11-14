@@ -193,7 +193,7 @@ export function KeyModelsDialog({ open, provider, onClose, onSaved }: Props) {
               : `${selected.size} of ${models.length} models will use this key. Models added later start switched off.`}
           </p>
           {error && (
-            <p role="alert" className="mb-3 rounded-[12px] border border-[#4A2020] bg-[#2A1516] px-3 py-2 text-[12.5px] leading-4 text-[#FF9A9A]">
+            <p role="alert" className="mb-3 rounded-[12px] border border-danger/30 bg-danger/10 px-3 py-2 text-[12.5px] leading-4 text-danger">
               {error}
             </p>
           )}
@@ -226,7 +226,7 @@ function Box({ checked }: { checked: boolean }) {
     <span
       aria-hidden="true"
       className={`grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[5px] border transition-colors duration-150 ${
-        checked ? "border-accent bg-accent text-white" : "border-[#3A3A3F] text-transparent"
+        checked ? "border-accent bg-accent text-white" : "border-hairline-strong text-transparent"
       }`}
     >
       <Check size={11} strokeWidth={3.5} />

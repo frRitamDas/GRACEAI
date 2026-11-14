@@ -15,6 +15,11 @@ import { configuredProviders, getProviderKey, keyServesModel } from "@/lib/ai/en
 import { cachedCatalog, storeCatalog } from "@/lib/ai/catalog-cache";
 import { loadCatalog } from "@/lib/ai/discovery";
 import { streamChat, titleFrom, type ChatAttachment, type ChatTurn } from "@/lib/ai/chat";
+import { codingSystemPrompt, extractFileBlocks } from "@/lib/ai/coding";
+import {
+  listWorkspaceFiles,
+  writeWorkspaceFile,
+} from "@/lib/workspace/store";
 import {
   addMessage,
   createConversation,
@@ -42,6 +47,13 @@ const schema = z.object({
   effort: z.number().int().min(0).max(EFFORT_LEVELS.length - 1).optional(),
   model: z.string().max(120).nullable().optional(),
   deepResearch: z.boolean().optional(),
+  /**
+   * True when the user has the workspace toggle on. The server still decides
+   * whether a coding turn is possible: it needs a conversation to hold files.
+   */
+  workspace: z.boolean().optional(),
+  /** File the user has open, so the agent reads it first. */
+  focus: z.string().max(240).nullable().optional(),
 });
 
 /** Credits for a turn: base model cost, scaled by effort, plus add-ons. */
@@ -143,9 +155,12 @@ export async function POST(request: Request) {
   // Conversation: reuse the one given, or create it with a title from the prompt.
   let conversationId = body.conversationId ?? null;
   let isNew = false;
+  // Kept so a workspace turn can name the project in its prompt.
+  let conversationTitle = body.message ? titleFrom(body.message) : "New chat";
   if (conversationId) {
     const existing = await getConversation(user.id, conversationId);
     if (!existing) return jsonError("That chat no longer exists.", 404);
+    conversationTitle = existing.title;
   } else {
     const conversation = await createConversation(user.id, titleFrom(body.message || "New chat"));
     conversationId = conversation.id;
@@ -166,6 +181,29 @@ export async function POST(request: Request) {
 
   const userContent = body.message || "Review the attached files.";
   turns.push({ role: "user", content: userContent });
+
+  // ---------------------------------------------------------------- workspace
+  // A workspace turn is a coding turn: the agent gets the conversation's files
+  // and may write them back. When the toggle is off we still *read* the files
+  // so a question about the code can be answered — turning the toggle off
+  // should not make Grace forget what the project is.
+  const workspaceOn = Boolean(body.workspace);
+  const workspaceFiles = await listWorkspaceFiles(conversationId);
+  const hasWorkspace = workspaceFiles.length > 0 || Boolean(body.workspace);
+  let systemPrompt: string | undefined;
+  if (hasWorkspace) {
+    systemPrompt = codingSystemPrompt({
+      projectName: conversationTitle || "this workspace",
+      files: workspaceFiles.map((f) => ({ path: f.path, content: f.content })),
+      focus: body.focus ?? null,
+      context: workspaceOn
+        ? `The workspace is enabled. Files you write are saved to the chat's workspace and shown to the user; nothing is committed to GitHub until they ask.`
+        : `The workspace is read-only for this turn: read the files, answer the question, do not change anything.`,
+      // A chat reply has to stay readable, so the agent gets less raw file text
+      // here than Grace Code gives it.
+      maxChars: 90_000,
+    });
+  }
 
   await addMessage({
     conversationId,
@@ -209,6 +247,7 @@ export async function POST(request: Request) {
           effortIndex: effort,
           turns,
           attachments,
+          systemPrompt,
           signal: request.signal,
         })) {
           if (event.type === "status") send({ type: "status", label: event.label });
@@ -234,11 +273,38 @@ export async function POST(request: Request) {
         });
       }
 
+      // -------------------------------------------------------- apply patches
+      // Only a workspace turn writes files, and only after the stream finished:
+      // a half-written reply must never leave the workspace in a state nobody
+      // chose. Empty bodies are skipped — that is truncation, not deletion.
+      let applied: string[] = [];
+      let prose = full;
+      if (workspaceOn && full.trim().length > 0) {
+        const parsed = extractFileBlocks(
+          full,
+          workspaceFiles.map((f) => f.path)
+        );
+        prose = parsed.text || full;
+        const writes: { path: string; content: string }[] = [];
+        for (const patch of parsed.patches) {
+          if (patch.content.trim().length === 0) continue;
+          if (await writeWorkspaceFile(conversationId!, patch.path, patch.content)) {
+            writes.push({ path: patch.path, content: patch.content });
+          }
+        }
+        applied = writes.map((w) => w.path);
+        if (applied.length > 0) {
+          // The client streamed the raw reply, file blocks included. Send the
+          // prose it should keep so the reader sees the answer, not the source.
+          send({ type: "files", paths: applied, text: prose });
+        }
+      }
+
       if (full.trim().length > 0) {
         await addMessage({
           conversationId: conversationId!,
           role: "assistant",
-          content: full,
+          content: prose,
           modelId: model.id,
           modelName: model.name,
           provider: model.provider,
