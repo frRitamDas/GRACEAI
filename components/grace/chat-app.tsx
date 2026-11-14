@@ -412,7 +412,7 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
                     : m
                 )
               );
-              if (meta) void loadWorkspace((meta as unknown as StreamMeta).conversationId);
+              if (meta) void loadWorkspace((meta as StreamMeta).conversationId);
             }
             if (event.type === "saved") {
               refreshUsage();

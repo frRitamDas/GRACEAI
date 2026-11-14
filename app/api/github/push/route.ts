@@ -122,12 +122,18 @@ export async function POST(request: Request) {
   );
 
   if (result.error) {
-    return NextResponse.json({ error: result.error, written: result.written }, { status: 400 });
+    return NextResponse.json(
+      { error: result.error, written: result.written, failed: result.failed },
+      { status: 400 }
+    );
   }
 
   return NextResponse.json({
     ok: true,
     written: result.written,
+    // A partial push is a success with a caveat, not a failure: the user needs
+    // to know which files landed and which GitHub refused.
+    failed: result.failed,
     url: `https://github.com/${target.repo.owner}/${target.repo.name}/tree/${target.repo.branch}`,
   });
 }

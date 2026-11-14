@@ -236,16 +236,25 @@ export function CodeApp({ initialProjects, initialModels, userModel }: Props) {
       const data = (await response.json().catch(() => ({}))) as {
         error?: string;
         written?: string[];
+        failed?: { path: string; error: string }[];
       };
       if (!response.ok) {
         setNotice(data.error ?? "That push did not go through.");
         return;
       }
       const count = data.written?.length ?? 0;
+      const failed = data.failed ?? [];
       setNotice(
-        `Pushed ${count} file${count === 1 ? "" : "s"} to ${project.repo.owner}/${project.repo.name}.`
+        failed.length > 0
+          ? `Pushed ${count} of ${count + failed.length}. GitHub refused ${failed
+              .map((f) => f.path)
+              .join(", ")}: ${failed[0].error}`
+          : `Pushed ${count} file${count === 1 ? "" : "s"} to ${project.repo.owner}/${project.repo.name}.`
       );
-      setTouched([]);
+      // Only clear the changed set when everything landed; the rest still needs
+      // a push, and clearing it would hide that.
+      if (failed.length === 0) setTouched([]);
+      else setTouched(failed.map((f) => f.path));
     } finally {
       setPushing(false);
     }

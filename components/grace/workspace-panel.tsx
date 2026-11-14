@@ -63,7 +63,14 @@ export function WorkspacePanel({
   const [query, setQuery] = useState("");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [pushing, setPushing] = useState(false);
-  const [pushed, setPushed] = useState<{ count: number; url: string | null } | null>(null);
+  const [pushed, setPushed] = useState<{
+    count: number;
+    url: string | null;
+    failed: { path: string; error: string }[];
+  } | null>(null);
+  // Pushing writes a commit to someone's repository, so it asks first. The
+  // panel arms the button and explains what will happen; a second click commits.
+  const [confirmPush, setConfirmPush] = useState(false);
 
   const loadRepos = useCallback(async () => {
     try {
@@ -213,14 +220,19 @@ export function WorkspacePanel({
       const data = (await response.json().catch(() => ({}))) as {
         error?: string;
         written?: string[];
+        failed?: { path: string; error: string }[];
         url?: string | null;
       };
+      setConfirmPush(false);
       if (!response.ok) {
         setError(data.error ?? "That push did not go through.");
         return;
       }
-      const count = data.written?.length ?? 0;
-      setPushed({ count, url: data.url ?? null });
+      setPushed({
+        count: data.written?.length ?? 0,
+        url: data.url ?? null,
+        failed: data.failed ?? [],
+      });
     } finally {
       setPushing(false);
     }
@@ -231,8 +243,15 @@ export function WorkspacePanel({
   );
   const selected = files.find((f) => f.path === selectedPath) ?? null;
 
+  // Every way out of the drawer disarms a pending push: backdrop, Escape, the
+  // close button. Otherwise a second click elsewhere could still commit.
+  const close = () => {
+    setConfirmPush(false);
+    onClose();
+  };
+
   return (
-    <Overlay open={open} onClose={onClose} labelledBy="workspace-title" variant="right">
+    <Overlay open={open} onClose={close} labelledBy="workspace-title" variant="right">
       <div className="flex h-full min-h-0 w-full flex-col">
         <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-4 py-3">
           <span className="grid h-8 w-8 place-items-center rounded-[10px] border border-white/[0.07] bg-white/[0.03]">
@@ -250,7 +269,7 @@ export function WorkspacePanel({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
             aria-label="Close workspace"
             className="press grid h-8 w-8 place-items-center rounded-[9px] text-muted hover:bg-white/[0.06] hover:text-ink"
           >
@@ -319,25 +338,65 @@ export function WorkspacePanel({
                 {repo && (
                   <button
                     type="button"
-                    onClick={() => void push()}
+                    onClick={() => {
+                      if (!confirmPush) {
+                        setConfirmPush(true);
+                        return;
+                      }
+                      setConfirmPush(false);
+                      void push();
+                    }}
                     disabled={pushing}
-                    className="press flex h-6 items-center gap-1 rounded-full bg-white/[0.07] px-2 text-[11px] font-semibold text-ink hover:bg-white/[0.12]"
+                    className={`press flex h-6 items-center gap-1 rounded-full px-2 text-[11px] font-semibold ${
+                      confirmPush
+                        ? "bg-accent text-white"
+                        : "bg-white/[0.07] text-ink hover:bg-white/[0.12]"
+                    }`}
                   >
                     {pushing ? (
                       <Loader2 size={10} className="animate-spin" />
                     ) : (
                       <Upload size={10} aria-hidden="true" />
                     )}
-                    Push
+                    {pushing ? "Pushing" : confirmPush ? "Confirm" : "Push"}
                   </button>
                 )}
               </div>
 
-              {pushed && (
-                <p className="mb-1.5 rounded-[8px] bg-success/10 px-2 py-1.5 text-[11.5px] leading-4 text-success">
-                  Pushed {pushed.count} {pushed.count === 1 ? "file" : "files"}
-                  {pushed.url ? " to GitHub." : "."}
+              {confirmPush && repo && (
+                <p className="mb-1.5 rounded-[8px] bg-white/[0.05] px-2 py-1.5 text-[11.5px] leading-4 text-sub">
+                  This writes a commit to{" "}
+                  <span className="font-mono text-ink">
+                    {repo.owner}/{repo.name}
+                  </span>{" "}
+                  on <span className="font-mono text-ink">{repo.branch}</span>, with only the files
+                  changed here.{" "}
+                  <button
+                    type="button"
+                    onClick={() => setConfirmPush(false)}
+                    className="underline decoration-dotted hover:text-ink"
+                  >
+                    Cancel
+                  </button>
                 </p>
+              )}
+
+              {pushed && (
+                <div className="mb-1.5 space-y-1">
+                  <p className="rounded-[8px] bg-success/10 px-2 py-1.5 text-[11.5px] leading-4 text-success">
+                    Pushed {pushed.count} {pushed.count === 1 ? "file" : "files"}
+                    {pushed.url ? " to GitHub." : "."}
+                  </p>
+                  {/* Say which files GitHub refused rather than reporting a flat
+                      success: the changed shas stay changed until re-read. */}
+                  {pushed.failed.length > 0 && (
+                    <p className="rounded-[8px] bg-warning/10 px-2 py-1.5 text-[11.5px] leading-4 text-warning">
+                      {pushed.failed.length} not written:{" "}
+                      <span className="font-mono">{pushed.failed.map((f) => f.path).join(", ")}</span>
+                      . {pushed.failed[0].error}
+                    </p>
+                  )}
+                </div>
               )}
 
               <ul className="space-y-px">

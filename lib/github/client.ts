@@ -331,8 +331,14 @@ export async function commitFiles(
   branch: string,
   files: { path: string; content: string; sha: string | null }[],
   message: string
-): Promise<{ written: string[]; error: string | null }> {
+): Promise<{
+  written: string[];
+  /** Files GitHub refused, with the reason, so the UI can name them. */
+  failed: { path: string; error: string }[];
+  error: string | null;
+}> {
   const written: string[] = [];
+  const failed: { path: string; error: string }[] = [];
   for (const file of files) {
     const result = await writeRepoFile(
       userId,
@@ -344,12 +350,19 @@ export async function commitFiles(
       file.sha,
       message
     );
-    if (!result.ok) {
-      return { written, error: result.error ?? "That commit could not be completed." };
+    if (result.ok) {
+      written.push(file.path);
+      continue;
     }
-    written.push(file.path);
+    // Continue past a single rejected file. One conflicted file used to abort
+    // the whole push, so the other files the user asked for never landed and
+    // the only fix was to re-read the repo and guess which one broke.
+    failed.push({ path: file.path, error: result.error ?? "That file was not written." });
   }
-  return { written, error: null };
+  if (written.length === 0 && failed.length > 0) {
+    return { written, failed, error: failed[0].error };
+  }
+  return { written, failed, error: null };
 }
 
 /** Branch list for the picker; falls back to the default branch on failure. */
