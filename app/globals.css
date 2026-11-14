@@ -1,0 +1,360 @@
+@import "tailwindcss";
+
+/*
+ * One extra breakpoint below `sm`. A 320px phone is still a real phone, and
+ * several headers run out of room there before 640px; `xs:` lets the layout
+ * drop a wordmark instead of pushing a button off the edge.
+ */
+@theme {
+  --breakpoint-xs: 26rem;
+}
+
+/*
+ * Grace design tokens — see DESIGN.md.
+ * One accent color, flat black, no gradients.
+ */
+:root {
+  --color-bg: #000000;
+  --color-surface: #1c1c1e;
+  --color-surface-raised: #26262a;
+  --color-control: #1a1a1c;
+  --color-border: #2e2e32;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #9a9a9f;
+  --color-text-muted: #5c5c62;
+  --color-accent: #3b82f6;
+  --color-accent-soft: #1e2a44;
+  --color-accent-text: #7aa8ff;
+  --color-disabled: #3a3a3f;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-pill: 999px;
+  --radius-menu: 24px;
+  --radius-modal: 28px;
+  --radius-card: 20px;
+
+  /* Inter carries the UI; it reads cleaner than Roboto at every size and has
+     true variable weights, so the type scale stops looking uniform. Roboto
+     stays in the chain as DESIGN.md asks. */
+  --font-family: "Inter Variable", "Roboto Variable", Roboto, system-ui,
+    -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Inter Variable", "Roboto Variable", Roboto, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo,
+    monospace;
+
+  /* Glass: one recipe, used everywhere a panel floats over the conversation.
+     Real backdrop blur is expensive on mobile GPUs, so it is applied to a
+     handful of large surfaces only, never to list rows. */
+  --glass-bg: rgba(22, 22, 25, 0.72);
+  --glass-strong-bg: rgba(18, 18, 21, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-highlight: rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+
+  /* Motion: one easing curve and one duration scale, so everything in the app
+     moves like it belongs to the same product. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 320ms;
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-raised: var(--color-surface-raised);
+  --color-control: var(--color-control);
+  --color-hairline: var(--color-border);
+  --color-ink: var(--color-text-primary);
+  --color-sub: var(--color-text-secondary);
+  --color-muted: var(--color-text-muted);
+  --color-accent: var(--color-accent);
+  --color-accent-soft: var(--color-accent-soft);
+  --color-accent-text: var(--color-accent-text);
+  --color-disabled: var(--color-disabled);
+
+  --font-sans: var(--font-family);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+
+  --radius-menu: var(--radius-menu);
+  --radius-modal: var(--radius-modal);
+  --radius-card: var(--radius-card);
+}
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    background: #000;
+    height: 100%;
+    /* Keep the black canvas behind the translucent browser chrome. */
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-text-primary);
+    font-family: var(--font-family);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv05" 1, "cv08" 1, "ss01" 1, "calt" 1;
+    letter-spacing: -0.011em;
+    min-height: 100%;
+    overscroll-behavior-y: none;
+  }
+
+  /* Large text needs tighter tracking; small text needs none. This is what
+     makes the type scale read as designed rather than scaled. */
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.022em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  code,
+  pre,
+  kbd {
+    font-family: var(--font-mono);
+    font-feature-settings: "calt" 0;
+  }
+
+  /* The effort slider and other draggable surfaces must never select text. */
+  [data-dragging="true"] {
+    cursor: grabbing;
+  }
+
+  ::selection {
+    background: rgba(59, 130, 246, 0.35);
+    color: #fff;
+  }
+
+  /* Visible 2px accent focus ring on keyboard navigation (DESIGN.md §9). */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  button,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+
+  textarea::placeholder,
+  input::placeholder {
+    color: var(--color-text-muted);
+    opacity: 1;
+  }
+}
+
+/* Thin, quiet scrollbars so the chat area stays calm. */
+@layer utilities {
+  .scroll-quiet {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+  .scroll-quiet::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scroll-quiet::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 999px;
+  }
+  .scroll-quiet::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  /* The floating surface: a hairline, a soft top highlight, real blur. */
+  .glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+  }
+
+  .glass-strong {
+    background: var(--glass-strong-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+  }
+
+  /* Bars pinned to an edge: blur, no shadow, one hairline on the inner side. */
+  .glass-bar {
+    background: rgba(10, 10, 12, 0.72);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+  }
+
+  /* Browsers without backdrop-filter get an opaque panel rather than a
+     translucent smear that makes text unreadable. */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass,
+    .glass-strong {
+      background: #16161a;
+    }
+    .glass-bar {
+      background: #0a0a0c;
+    }
+  }
+
+  /* Softer, smaller elevation for hoverable cards. */
+  .lift {
+    transition:
+      transform var(--dur-base) var(--ease-out),
+      border-color var(--dur-base) var(--ease-out),
+      background-color var(--dur-base) var(--ease-out);
+  }
+
+  .lift:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Motion (DESIGN.md §7). One fade-up on the greeting, 200ms sheets,   */
+/* 200ms modal scale. Reduced motion keeps fades only.                */
+/* ------------------------------------------------------------------ */
+@keyframes grace-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes grace-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes grace-sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes grace-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes grace-caret-blink {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  71%,
+  100% {
+    opacity: 0.15;
+  }
+}
+
+.animate-fade-up {
+  animation: grace-fade-up 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.animate-fade-in {
+  animation: grace-fade-in 180ms ease-out both;
+}
+.animate-sheet-up {
+  animation: grace-sheet-up 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.animate-modal-in {
+  animation: grace-modal-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Lists that arrive one row at a time read as assembling rather than
+   appearing. Capped so a long list is never slow to use. */
+.stagger > * {
+  animation: grace-fade-up 260ms var(--ease-out) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 22ms; }
+.stagger > *:nth-child(3) { animation-delay: 44ms; }
+.stagger > *:nth-child(4) { animation-delay: 66ms; }
+.stagger > *:nth-child(5) { animation-delay: 88ms; }
+.stagger > *:nth-child(6) { animation-delay: 110ms; }
+.stagger > *:nth-child(7) { animation-delay: 132ms; }
+.stagger > *:nth-child(8) { animation-delay: 154ms; }
+.stagger > *:nth-child(n + 9) { animation-delay: 176ms; }
+
+/* Shared hover lift for interactive cards, so buttons across the app respond
+   at the same speed with the same curve. */
+.press {
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+.press:active {
+  transform: scale(0.985);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-sheet-up,
+  .animate-modal-in,
+  .stagger > * {
+    animation: grace-fade-in 1ms linear both;
+  }
+  .press:active {
+    transform: none;
+  }
+  * {
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+}
