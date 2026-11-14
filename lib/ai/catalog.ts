@@ -285,8 +285,9 @@ export const MODELS: ModelDef[] = [
     upstream: "nvidia/nemotron-3-ultra-550b-a55b",
     tier: 5,
     credits: 3,
-    contextLabel: "1M context",
-    blurb: "NVIDIA's flagship reasoning model — huge context.",
+    // OpenRouter lists 262K for the paid endpoint; only the free one runs to 1M.
+    contextLabel: "262K context",
+    blurb: "NVIDIA's 550B flagship — long-context reasoning.",
   },
   {
     id: "openrouter/nvidia/nemotron-3-ultra:free",

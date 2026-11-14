@@ -62,10 +62,37 @@ export function CodeApp({ initialProjects }: Props) {
   const [liveText, setLiveText] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
   const [touched, setTouched] = useState<string[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [githubOpen, setGithubOpen] = useState(false);
   const [pushing, setPushing] = useState(false);
+
+  // The OAuth callback returns to /code?github=…; the sheet was unmounted while
+  // the browser was away on github.com, so reopen it and explain the result.
+  useEffect(() => {
+    const result = new URLSearchParams(window.location.search).get("github");
+    if (!result) return;
+    window.history.replaceState({}, "", "/code");
+    const reasons: Record<string, string> = {
+      denied: "GitHub access was declined. Nothing was changed.",
+      state: "That sign-in did not come from this browser. Try connecting again.",
+      unreachable: "GitHub could not be reached. Try again in a moment.",
+      unavailable: "GitHub OAuth is not configured on this deployment. Paste a token instead.",
+      failed: "GitHub could not finish the connection. Try again, or paste a token.",
+    };
+    // Deferred a tick so the first paint is not interrupted by a state update,
+    // which is also what the lint rule asks for.
+    const timer = window.setTimeout(() => {
+      setGithubOpen(true);
+      setNotice(
+        result === "connected" || result === "imported"
+          ? "GitHub connected. Pick a repository to import."
+          : (reasons[result] ?? "GitHub could not finish the connection.")
+      );
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);

@@ -82,7 +82,7 @@ export function Overlay({
     >
       {!transparent && (
         <div
-          className="absolute inset-0 animate-fade-in bg-black/60"
+          className="absolute inset-0 animate-fade-in bg-black/75 backdrop-blur-[2px]"
           aria-hidden="true"
         />
       )}

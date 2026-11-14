@@ -15,7 +15,7 @@ blue, fully rounded controls, and more than 48px touch targets everywhere.
 | --- | --- |
 | Chat with streaming answers | ✅ NDJSON stream, stop button, regenerate, copy |
 | Effort routing (Instant → Ultra) | ✅ five levels, temperature + reasoning hints, model tier mapping |
-| Frontier model picker | ✅ 26 models across OpenRouter, Groq, Google AI Studio and NVIDIA, per-chat override |
+| Frontier model picker | ✅ live discovery across OpenRouter, Groq, Google AI Studio plus a curated NVIDIA set, per-chat override |
 | Grace Code | ✅ a real file workspace with a multi-file agent, plus GitHub import and push |
 | Provider connection | ✅ server-side keys (env or admin console), write-only from the browser |
 | Accounts | ✅ email + password, scrypt hashes, httpOnly session cookies |
