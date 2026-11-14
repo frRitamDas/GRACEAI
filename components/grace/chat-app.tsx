@@ -543,6 +543,7 @@ export function ChatApp({ initialUser, initialUsage, initialConversations, initi
         onSelect={(id) => void openConversation(id)}
         onNew={newChat}
         onDelete={(id) => void deleteConversation(id)}
+        onSignOut={() => void signOut()}
       />
 
       <div className="relative mx-auto flex h-[100dvh] min-w-0 flex-1 flex-col overflow-hidden bg-black">

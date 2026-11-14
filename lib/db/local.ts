@@ -95,6 +95,29 @@ export type LocalDb = {
     free: boolean;
     updated_at: string;
   }[];
+  codeProjects: {
+    id: string;
+    user_id: string;
+    name: string;
+    language: string;
+    instructions: string;
+    created_at: string;
+    updated_at: string;
+  }[];
+  codeFiles: {
+    project_id: string;
+    path: string;
+    content: string;
+    updated_at: string;
+  }[];
+  codeMessages: {
+    id: string;
+    project_id: string;
+    role: "user" | "assistant";
+    content: string;
+    touched: string[];
+    created_at: string;
+  }[];
   providerKeys: {
     provider: string;
     api_key: string;
@@ -114,6 +137,9 @@ const EMPTY: LocalDb = {
   usage: [],
   providerKeys: [],
   modelOverrides: [],
+  codeProjects: [],
+  codeFiles: [],
+  codeMessages: [],
 };
 
 const LOCAL_DIR = path.join(process.cwd(), ".data");

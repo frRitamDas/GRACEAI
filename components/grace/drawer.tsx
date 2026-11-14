@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, MessageSquarePlus, Settings2, ShieldCheck, Trash2, X } from "lucide-react";
+import { Code2, LogOut, MessageSquarePlus, Settings2, ShieldCheck, Trash2, X } from "lucide-react";
 import Link from "next/link";
 
 import { Overlay } from "@/components/grace/sheet";
@@ -123,6 +123,16 @@ export function Drawer({
         </div>
 
         <div className="border-t border-hairline px-3 py-2">
+          <Link
+            href="/code"
+            onClick={onClose}
+            className="flex h-12 items-center gap-3 rounded-[14px] px-3 text-[16px] text-sub transition-colors hover:bg-raised hover:text-ink"
+          >
+            <Code2 size={18} aria-hidden="true" /> Grace Code
+            <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold text-accent-text">
+              New
+            </span>
+          </Link>
           <Link
             href="/settings"
             onClick={onClose}

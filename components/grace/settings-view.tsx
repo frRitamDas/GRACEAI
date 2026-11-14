@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, ExternalLink, KeyRound } from "lucide-react";
+import { ArrowLeft, Check, Code2, ExternalLink, KeyRound, LogOut } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -246,6 +246,50 @@ export function SettingsView({ user, providers, models, isAdmin }: Props) {
           </div>
         </Section>
       )}
+
+      <Section title="Workspace">
+        <div className="space-y-2">
+          <Link
+            href="/code"
+            className="flex items-start gap-3 rounded-[16px] border border-hairline bg-control p-4 transition-colors hover:border-[#3A3A3F]"
+          >
+            <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent-soft text-accent-text">
+              <Code2 size={17} aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex flex-wrap items-center gap-2 text-[15px] font-semibold text-ink">
+                Grace Code
+                <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold text-accent-text">
+                  New
+                </span>
+              </span>
+              <span className="mt-0.5 block text-[13.5px] leading-5 text-sub">
+                A coding workspace. Grace reads a project&apos;s files and writes changes back.
+              </span>
+            </span>
+          </Link>
+
+          <button
+            type="button"
+            onClick={async () => {
+              await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+              router.replace("/");
+              router.refresh();
+            }}
+            className="flex w-full items-center gap-3 rounded-[16px] border border-hairline bg-control p-4 text-left transition-colors hover:border-[#3A3A3F]"
+          >
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#211618] text-[#E08A8A]">
+              <LogOut size={16} aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold text-ink">Sign out</span>
+              <span className="mt-0.5 block text-[13.5px] leading-5 text-sub">
+                You will need your password to come back.
+              </span>
+            </span>
+          </button>
+        </div>
+      </Section>
 
       <p className="mt-8 text-center text-[13px] text-muted">
         Grace can make mistakes. {busy ? "Saving…" : "Changes save as you go."}

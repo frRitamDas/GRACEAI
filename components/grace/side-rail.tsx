@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageSquarePlus, Settings2, ShieldCheck, Trash2 } from "lucide-react";
+import { Code2, LogOut, MessageSquarePlus, Settings2, ShieldCheck, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 import { GraceMark } from "@/components/grace/logo";
@@ -13,6 +13,7 @@ type Props = {
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
+  onSignOut: () => void;
 };
 
 /**
@@ -20,7 +21,7 @@ type Props = {
  * desktop the drawer would be a wasted click, so the list sits permanently
  * beside the conversation and the chat column keeps its comfortable measure.
  */
-export function SideRail({ user, conversations, activeId, onSelect, onNew, onDelete }: Props) {
+export function SideRail({ user, conversations, activeId, onSelect, onNew, onDelete, onSignOut }: Props) {
   return (
     <aside
       aria-label="Chat history"
@@ -94,6 +95,16 @@ export function SideRail({ user, conversations, activeId, onSelect, onNew, onDel
 
       <div className="mt-3 space-y-0.5 border-t border-hairline pt-3">
         <Link
+          href="/code"
+          className="group flex h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-[13.5px] text-sub transition-colors hover:bg-[#161618] hover:text-ink"
+        >
+          <Code2 size={15} aria-hidden="true" />
+          <span className="flex-1">Grace Code</span>
+          <span className="rounded-full bg-control px-1.5 py-0.5 text-[9.5px] font-semibold text-accent-text">
+            New
+          </span>
+        </Link>
+        <Link
           href="/settings"
           className="flex h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-[13.5px] text-sub transition-colors hover:bg-[#161618] hover:text-ink"
         >
@@ -109,6 +120,14 @@ export function SideRail({ user, conversations, activeId, onSelect, onNew, onDel
             Admin console
           </Link>
         )}
+        <button
+          type="button"
+          onClick={onSignOut}
+          className="flex h-9 w-full items-center gap-2.5 rounded-[10px] px-2.5 text-[13.5px] text-sub transition-colors hover:bg-[#161618] hover:text-ink"
+        >
+          <LogOut size={15} aria-hidden="true" />
+          Sign out
+        </button>
       </div>
     </aside>
   );

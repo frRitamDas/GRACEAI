@@ -1,6 +1,15 @@
 @import "tailwindcss";
 
 /*
+ * One extra breakpoint below `sm`. A 320px phone is still a real phone, and
+ * several headers run out of room there before 640px; `xs:` lets the layout
+ * drop a wordmark instead of pushing a button off the edge.
+ */
+@theme {
+  --breakpoint-xs: 26rem;
+}
+
+/*
  * Grace design tokens — see DESIGN.md.
  * One accent color, flat black, no gradients.
  */
