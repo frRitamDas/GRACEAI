@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
-
 import { AuthDialog } from "@/components/marketing/auth-panel";
 import { Landing } from "@/components/marketing/landing";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -8,10 +6,10 @@ import { getSettings } from "@/lib/settings";
 /**
  * The public page.
  *
- * `/welcome` holds the marketing page and the account dialog; `/` is the chat
- * for signed-in people. A guest who lands on `/` is redirected here, and a
- * signed-in visitor who opens this page is sent to the chat — unless they came
- * to sign in to a different account, which `?mode=` says explicitly.
+ * `/welcome` holds the public marketing page and the account dialog; `/` is
+ * the chat for signed-in people. A guest who lands on `/` is redirected here.
+ * Signed-in people can also open `/welcome` directly to view the public page;
+ * its primary action takes them back to chat.
  *
  * With `?mode=signin|signup` the dialog opens over the page instead of being a
  * route of its own: no second full page load, and the hero stays visible behind
@@ -40,7 +38,6 @@ export default async function WelcomePage({
   ]);
 
   const mode = params.mode === "signup" || params.mode === "signin" ? params.mode : null;
-  if (user && !mode) redirect("/");
 
   return (
     <>

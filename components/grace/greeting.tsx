@@ -41,7 +41,7 @@ export function Greeting({
   const line = template.replaceAll("{name}", name || "there");
 
   return (
-    <h1 className="animate-fade-up mx-auto max-w-[24ch] text-center text-[21px] font-medium leading-[29px] tracking-[-0.02em] text-sub sm:text-[26px] sm:leading-[34px]">
+    <h1 className="animate-fade-up mx-auto max-w-[36ch] text-center text-[24px] font-medium leading-[31px] tracking-[-0.025em] text-sub sm:text-[30px] sm:leading-[38px]">
       {line}
     </h1>
   );
