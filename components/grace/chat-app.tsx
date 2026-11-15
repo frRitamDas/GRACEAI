@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowDown, X } from "lucide-react";
+import { ArrowDown, ArrowUpRight, Code2, Lightbulb, PencilLine, Workflow, X } from "lucide-react";
 
 import { ChatHeader } from "@/components/grace/chat-header";
 import { Composer } from "@/components/grace/composer";
@@ -698,43 +698,94 @@ export function ChatApp({
         className="scroll-quiet relative z-0 min-h-0 flex-1 overflow-y-auto overscroll-contain"
       >
         {empty ? (
-          <div className="flex h-full flex-col px-4">
-            {/* The reference puts the greeting directly under the header —
-                measured at ~13 CSS px below it at 852px tall — and leaves the
-                rest of the column open. Starters hang below it; they are hidden
-                on short windows so they can never crowd the composer. */}
+          <div className="flex h-full flex-col justify-center px-4 pb-10 sm:pb-14">
             <div className="mx-auto w-full max-w-[var(--thread-w)]">
-              <div className="flex flex-col items-center px-1 pt-[14px] sm:px-5 sm:pt-9">
+              <div className="flex flex-col items-center px-1 sm:px-5">
                 <Greeting name={greetingName} lines={greetings} />
+                <p className="animate-fade-up mt-2 text-center text-[12.5px] leading-5 text-muted sm:text-[13px]">
+                  A little clarity can start with a question.
+                </p>
 
-                <div className="animate-fade-up mt-6 grid w-full max-w-[620px] grid-cols-1 gap-2 xs:grid-cols-2 [@media(max-height:600px)]:hidden">
-                  {(codeMode
-                    ? [
-                        { title: "Read a repository", body: "Attach a repo and explain how it fits together." },
-                        { title: "Plan a change", body: "Outline the files to touch before anything is written." },
-                        { title: "Fix a failing path", body: "Paste an error and trace it to the cause." },
-                        { title: "Write the README", body: "Setup, usage, and the parts that are easy to get wrong." },
-                      ]
-                    : [
-                        { title: "Explain something", body: "A concept, a document, or a piece of code." },
-                        { title: "Draft and revise", body: "Write it, then tighten it until it reads well." },
-                        { title: "Work through a problem", body: "Lay out the options and argue for one." },
-                        { title: "Build something small", body: "A script, a page, or a fix — end to end." },
-                      ]
-                  ).map((starter) => (
-                    <button
-                      key={starter.title}
-                      type="button"
-                      onClick={() => {
-                        setInput(`${starter.title}: `);
-                        composerInputRef.current?.focus();
-                      }}
-                      className="press rounded-[16px] border border-hairline bg-control px-3.5 py-3 text-left transition-colors hover:border-hairline-strong hover:bg-surface"
-                    >
-                      <p className="text-[13px] font-semibold text-ink">{starter.title}</p>
-                      <p className="mt-0.5 text-[12px] leading-[17px] text-muted">{starter.body}</p>
-                    </button>
-                  ))}
+                <div className="animate-fade-up mt-7 w-full max-w-[680px] [@media(max-height:600px)]:hidden" style={{ animationDelay: "50ms" }}>
+                  <p className="mb-2.5 px-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                    A few ways to begin
+                  </p>
+                  <div className="grid grid-cols-1 gap-2 xs:grid-cols-2">
+                    {(codeMode
+                      ? [
+                          {
+                            title: "Read a repository",
+                            body: "Get a clear map of the project",
+                            prompt: "Read this repository and give me a quick map of its structure.",
+                            icon: <Code2 size={17} strokeWidth={1.8} />,
+                          },
+                          {
+                            title: "Plan a change",
+                            body: "Outline the smallest safe next step",
+                            prompt: "Help me plan a small code change before editing any files.",
+                            icon: <Workflow size={17} strokeWidth={1.8} />,
+                          },
+                          {
+                            title: "Fix a failing path",
+                            body: "Trace an error back to its source",
+                            prompt: "Help me trace this error to its source: ",
+                            icon: <Lightbulb size={17} strokeWidth={1.8} />,
+                          },
+                          {
+                            title: "Write the README",
+                            body: "Make setup and usage easy to follow",
+                            prompt: "Draft a clear README structure for this project.",
+                            icon: <PencilLine size={17} strokeWidth={1.8} />,
+                          },
+                        ]
+                      : [
+                          {
+                            title: "Understand an idea",
+                            body: "Make a difficult concept feel simple",
+                            prompt: "Explain why seasons change using one simple analogy.",
+                            icon: <Lightbulb size={17} strokeWidth={1.8} />,
+                          },
+                          {
+                            title: "Write something",
+                            body: "Find the words, then make them sharper",
+                            prompt: "Draft a friendly thank-you note to a teammate who helped me this week.",
+                            icon: <PencilLine size={17} strokeWidth={1.8} />,
+                          },
+                          {
+                            title: "Think it through",
+                            body: "Compare choices and find a direction",
+                            prompt: "Help me compare two options with a clear pros-and-cons framework.",
+                            icon: <Workflow size={17} strokeWidth={1.8} />,
+                          },
+                          {
+                            title: "Build a small tool",
+                            body: "A script, a page, or a practical fix",
+                            prompt: "Plan a small to-do list app with three useful core features.",
+                            icon: <Code2 size={17} strokeWidth={1.8} />,
+                          },
+                        ]
+                    ).map((starter) => (
+                      <button
+                        key={starter.title}
+                        type="button"
+                        aria-label={`Start with: ${starter.title}`}
+                        onClick={() => {
+                          setInput(starter.prompt);
+                          composerInputRef.current?.focus();
+                        }}
+                        className="press group flex min-h-[68px] w-full items-center gap-3 rounded-[17px] border border-hairline bg-control/75 p-3 text-left transition-colors hover:border-hairline-strong hover:bg-surface sm:p-3.5"
+                      >
+                        <span className="grid size-10 shrink-0 place-items-center rounded-[12px] border border-hairline bg-bg text-sub transition-colors group-hover:text-ink">
+                          {starter.icon}
+                        </span>
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="truncate text-[12.5px] font-semibold leading-[18px] text-ink">{starter.title}</span>
+                          <span className="truncate text-[11px] leading-[16px] text-muted">{starter.body}</span>
+                        </span>
+                        <ArrowUpRight size={14} className="shrink-0 text-muted/60 transition-colors group-hover:text-accent-text" aria-hidden="true" />
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {!providerReady && (

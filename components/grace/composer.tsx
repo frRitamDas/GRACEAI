@@ -39,9 +39,9 @@ type Props = {
  *
  * One pill, sampled from the reference: a round add/close button on the left,
  * a transparent single-line field that grows to five lines, the blue effort
- * gauge, the microphone, and a dark circular send. The bar is `#131313` with no
- * border, which is what makes it read as a hole in the black canvas rather than
- * a card sitting on top of it.
+ * gauge, the microphone, and a dark circular send. A quiet control surface and
+ * hairline border keep it distinct from the black canvas without making it a
+ * heavy card.
  */
 export function Composer({
   value,
@@ -167,7 +167,7 @@ export function Composer({
           deepResearchOn={deepResearchOn}
         />
 
-        <div className="rounded-[22px] bg-[#131313] sm:rounded-[24px]">
+        <div className="rounded-[24px] border border-hairline bg-control transition-colors focus-within:border-hairline-strong sm:rounded-[26px]">
           {attachments.length > 0 && (
             <ul className="flex flex-wrap gap-1.5 px-3 pt-3">
               {attachments.map((file) => (
@@ -218,7 +218,7 @@ export function Composer({
                   if (canSend) onSend();
                 }
               }}
-              placeholder="Ask Grace"
+              placeholder="Ask Grace anything…"
               enterKeyHint="send"
               className="scroll-quiet mb-px block max-h-[136px] w-full flex-1 resize-none bg-transparent py-2.5 text-[16px] leading-6 text-ink outline-none placeholder:text-[#6b6b71]"
             />
