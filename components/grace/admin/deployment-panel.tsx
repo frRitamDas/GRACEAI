@@ -368,7 +368,7 @@ function AnnouncementCard({
   return (
     <Card
       title="Announcement"
-      note="A single line across the top of the public page. Saving a new line replaces the old one; hiding it needs no cleanup."
+      note="A single line across the public page and chat. Saving a new line replaces the old one; hiding it needs no cleanup."
     >
       <div className="flex flex-col gap-2">
         <label htmlFor="announce-text" className="text-[12px] font-medium text-sub">

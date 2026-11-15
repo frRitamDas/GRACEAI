@@ -34,7 +34,7 @@ export function ChatHeader({
   remainingPct,
   onUsage,
   onNewChat,
-  brandName = "Grace",
+  brandName = "GRACE AI",
   onToggleSidebar,
   sidebarCollapsed,
 }: Props) {

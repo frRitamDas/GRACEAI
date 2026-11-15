@@ -8,10 +8,9 @@ import { GraceMark } from "@/components/grace/logo";
 /**
  * The account dialog.
  *
- * One card over the public page, two modes, plain-language errors. It lives
- * inside the paper theme, so it is built from the same tokens as the marketing
- * page rather than the dark chat palette; opening it must not look like leaving
- * the page you were reading.
+ * One card over the public page, two modes, plain-language errors. It uses the
+ * same dark surface tokens as the rest of Grace, so signing in feels like a
+ * continuation of the product rather than a separate destination.
  *
  * `prompt` carries whatever the visitor typed into the hero composer. On
  * success it is handed to the chat as `?prompt=`, so the first thing they see
@@ -93,8 +92,7 @@ export function AuthDialog({
 
   return (
     <div
-      data-theme="paper"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-[#2E2B29]/32 p-0 backdrop-blur-[2px] sm:items-center sm:p-6"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-0 backdrop-blur-sm sm:items-center sm:p-6"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !busy) router.push(dismissHref);
@@ -104,10 +102,10 @@ export function AuthDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="auth-title"
-        className="paper-rise w-full max-w-[420px] rounded-t-[20px] border border-hairline bg-surface p-5 shadow-[0_24px_60px_rgba(46,43,41,0.18)] sm:rounded-[16px] sm:p-6"
+        className="animate-modal-in w-full max-w-[420px] rounded-t-[24px] border border-hairline bg-surface p-5 shadow-[0_24px_60px_rgba(0,0,0,0.55)] sm:rounded-[24px] sm:p-6"
       >
         <div className="mb-5 flex items-start gap-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[#252523] text-[#FCFAF8]">
+          <span className="grid size-9 shrink-0 place-items-center rounded-[11px] border border-hairline bg-control text-ink">
             <GraceMark className="h-[20px] w-[20px]" />
           </span>
           <div className="min-w-0 flex-1">
@@ -133,7 +131,7 @@ export function AuthDialog({
         </div>
 
         {signupEnabled && (
-          <div className="mb-4 flex rounded-[7px] bg-surface-raised p-0.5" role="tablist" aria-label="Account mode">
+          <div className="mb-4 flex rounded-[10px] bg-control p-0.5" role="tablist" aria-label="Account mode">
             {(
               [
                 ["signup", "Create account"],
@@ -147,7 +145,7 @@ export function AuthDialog({
                 aria-selected={mode === id}
                 onClick={() => switchTo(id)}
                 className={`flex-1 rounded-[5px] py-1.5 text-[12.5px] font-medium transition-colors ${
-                  mode === id ? "bg-surface text-ink shadow-[0_1px_2px_rgba(46,43,41,0.08)]" : "text-sub hover:text-ink"
+                  mode === id ? "bg-surface text-ink" : "text-sub hover:text-ink"
                 }`}
               >
                 {label}
@@ -200,7 +198,7 @@ export function AuthDialog({
                 onChange={(event) => setPassword(event.target.value)}
                 autoComplete={mode === "signup" ? "new-password" : "current-password"}
                 placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
-                className="h-10 w-full rounded-[6px] border border-[#E3DED8] bg-surface px-3 pr-10 text-[14px] text-ink outline-none transition-colors placeholder:text-muted focus:border-[#252523]"
+                className="h-11 w-full rounded-[12px] border border-hairline bg-control px-3 pr-10 text-[14px] text-ink outline-none transition-colors placeholder:text-muted focus:border-accent"
               />
               <button
                 type="button"
@@ -227,7 +225,7 @@ export function AuthDialog({
           </div>
 
           {error && (
-            <p role="alert" className="rounded-[6px] bg-[#B4372C]/8 px-2.5 py-2 text-[12px] leading-[17px] text-[#B4372C]">
+            <p role="alert" className="rounded-[10px] border border-danger/30 bg-danger/10 px-3 py-2.5 text-[12px] leading-[17px] text-danger">
               {error}
             </p>
           )}
@@ -235,7 +233,7 @@ export function AuthDialog({
           <button
             type="submit"
             disabled={busy}
-            className="mt-1 h-10 rounded-[4px] bg-[#252523] text-[13.5px] font-medium text-[#FCFAF8] transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="press mt-1 h-11 rounded-full bg-ink text-[13.5px] font-semibold text-bg transition-opacity hover:opacity-85 disabled:opacity-50"
           >
             {busy ? "One moment…" : mode === "signup" ? "Create account" : "Sign in"}
           </button>
@@ -284,7 +282,7 @@ function Field({
         placeholder={placeholder}
         required
         maxLength={200}
-        className="h-10 w-full rounded-[6px] border border-[#E3DED8] bg-surface px-3 text-[14px] text-ink outline-none transition-colors placeholder:text-muted focus:border-[#252523]"
+        className="h-11 w-full rounded-[12px] border border-hairline bg-control px-3 text-[14px] text-ink outline-none transition-colors placeholder:text-muted focus:border-accent"
       />
     </div>
   );

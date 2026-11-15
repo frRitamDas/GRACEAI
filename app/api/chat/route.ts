@@ -209,7 +209,7 @@ export async function POST(request: Request) {
   // Grace is one assistant with one author. Which model is behind a turn is an
   // implementation detail the owner controls, so the reply never names a lab,
   // a model or a provider, whatever the user calls it.
-  const persona = gracePersona(settings.brandName);
+  const persona = gracePersona();
   let systemPrompt: string | undefined = persona;
   if (hasWorkspace) {
     systemPrompt = codingSystemPrompt({
