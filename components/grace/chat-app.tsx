@@ -24,6 +24,7 @@ type Props = {
   initialUsage: UsageData;
   initialConversations: ConversationSummary[];
   anyConfigured: boolean;
+  announcement: { id: string; text: string; href: string } | null;
   /** Product name from the deployment settings, so the header chip is the brand. */
   brandName: string;
   /** Whether the owner has chat switched on; off shows an honest paused state. */
@@ -55,6 +56,7 @@ export function ChatApp({
   initialUsage,
   initialConversations,
   anyConfigured,
+  announcement,
   brandName,
   chatEnabled,
   greetings,
@@ -82,6 +84,7 @@ export function ChatApp({
   const [menuOpen, setMenuOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notice, setNotice] = useState<{ text: string; action?: { label: string; href: string } } | null>(null);
+  const [dismissedAnnouncementKey, setDismissedAnnouncementKey] = useState<string | null>(null);
 
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [codeMode, setCodeMode] = useState(false);
@@ -638,6 +641,7 @@ export function ChatApp({
   };
 
   const empty = messages.length === 0;
+  const announcementKey = announcement ? `${announcement.id}|${announcement.text}|${announcement.href}` : "";
 
   return (
     <div className="flex h-[100dvh] min-h-0 w-full flex-col">
@@ -649,6 +653,43 @@ export function ChatApp({
         onToggleSidebar={() => setDrawerOpen(true)}
         sidebarCollapsed={false}
       />
+
+      {announcement && dismissedAnnouncementKey !== announcementKey && (
+        <div className="relative z-10 px-3 pb-1.5 sm:px-5">
+          <div
+            role="status"
+            aria-live="polite"
+            className="mx-auto flex w-full max-w-[var(--thread-w)] items-center gap-2 rounded-[14px] border border-hairline bg-accent-soft/70 px-3 py-2 text-[12px] leading-[18px] text-ink sm:px-3.5 sm:text-[12.5px]"
+          >
+            <span className="size-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true" />
+            <span className="min-w-0 flex-1">{announcement.text}</span>
+            {announcement.href && (
+              announcement.href.startsWith("/") ? (
+                <Link href={announcement.href} className="shrink-0 font-semibold text-accent-text hover:underline">
+                  More
+                </Link>
+              ) : (
+                <a
+                  href={announcement.href}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="shrink-0 font-semibold text-accent-text hover:underline"
+                >
+                  More
+                </a>
+              )
+            )}
+            <button
+              type="button"
+              onClick={() => setDismissedAnnouncementKey(announcementKey)}
+              aria-label="Dismiss announcement"
+              className="press -mr-1 grid size-7 shrink-0 place-items-center rounded-full text-sub hover:bg-white/[0.06] hover:text-ink"
+            >
+              <X size={13} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <main
         ref={scrollRef}

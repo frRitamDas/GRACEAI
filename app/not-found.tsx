@@ -9,14 +9,11 @@ export default async function NotFound() {
   // rendering too, otherwise Next tries to prerender it with runtime metadata.
   await connection();
   return (
-    <main
-      data-theme="paper"
-      className="flex min-h-[100dvh] flex-col items-center justify-center bg-bg px-6 text-center text-ink"
-    >
-      <span className="grid size-12 place-items-center rounded-[14px] border border-hairline bg-surface">
+    <main className="flex min-h-[100dvh] flex-col items-center justify-center bg-bg px-6 text-center text-ink">
+      <span className="grid size-12 place-items-center rounded-full border border-hairline bg-control">
         <GraceMark className="h-6 w-6 text-ink" />
       </span>
-      <h1 className="mt-5 font-display text-[26px] leading-tight tracking-[-0.02em] text-ink">
+      <h1 className="mt-5 text-[26px] font-semibold leading-tight tracking-[-0.03em] text-ink">
         That page is not here
       </h1>
       <p className="mt-2 max-w-[26rem] text-[14px] leading-[22px] text-sub">

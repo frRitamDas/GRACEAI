@@ -20,12 +20,12 @@ import { getSettings } from "@/lib/settings";
 export const instant = false;
 
 /**
- * The public page is paper, so the browser chrome goes light with it: a phone's
- * status bar and the scrollbar should not stay black around a white page.
+ * Keep the browser chrome and mobile status bar aligned with Grace's dark
+ * public surface.
  */
 export const viewport = {
-  themeColor: "#FCFAF8",
-  colorScheme: "light",
+  themeColor: "#000000",
+  colorScheme: "dark",
 };
 
 export default async function WelcomePage({

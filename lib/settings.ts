@@ -54,8 +54,8 @@ export type DeploymentSettings = {
 };
 
 export const DEFAULT_SETTINGS: DeploymentSettings = {
-  brandName: "Grace",
-  tagline: "An AI that keeps things clear.",
+  brandName: "GRACE AI",
+  tagline: "A calmer space to think clearly.",
   chatEnabled: true,
   signupEnabled: true,
   greetings: [
@@ -109,6 +109,16 @@ function merge(base: DeploymentSettings, patch: Partial<DeploymentSettings>): De
   };
 }
 
+/** Carry forward operator edits while replacing only the former shipped defaults. */
+function migrateLegacyDefaults(stored: Partial<DeploymentSettings>): Partial<DeploymentSettings> {
+  return {
+    ...stored,
+    brandName: stored.brandName === "Grace" ? DEFAULT_SETTINGS.brandName : stored.brandName,
+    tagline:
+      stored.tagline === "An AI that keeps things clear." ? DEFAULT_SETTINGS.tagline : stored.tagline,
+  };
+}
+
 export async function getSettings(): Promise<DeploymentSettings> {
   // These are the console's switches. They are read at request time, never baked
   // into a prerendered page, or a banner the owner removed would keep showing
@@ -121,13 +131,13 @@ export async function getSettings(): Promise<DeploymentSettings> {
   let value: DeploymentSettings = DEFAULT_SETTINGS;
   if (localMode()) {
     const row = await readLocalDb((db) => db.settings ?? null);
-    if (row) value = merge(DEFAULT_SETTINGS, row as Partial<DeploymentSettings>);
+    if (row) value = merge(DEFAULT_SETTINGS, migrateLegacyDefaults(row as Partial<DeploymentSettings>));
   } else {
     const supabase = getSupabaseAdmin();
     if (supabase) {
       const { data } = await supabase.from("grace_settings").select("value").eq("id", "deployment").maybeSingle();
       const stored = (data?.value ?? null) as Partial<DeploymentSettings> | null;
-      if (stored) value = merge(DEFAULT_SETTINGS, stored);
+      if (stored) value = merge(DEFAULT_SETTINGS, migrateLegacyDefaults(stored));
     }
   }
 

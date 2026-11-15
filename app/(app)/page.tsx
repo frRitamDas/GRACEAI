@@ -45,6 +45,7 @@ export default async function ChatPage({
       initialUsage={shell.usage}
       initialConversations={shell.conversations}
       anyConfigured={status.some((s) => s.configured)}
+      announcement={settings.announcement}
       brandName={settings.brandName}
       chatEnabled={settings.chatEnabled}
       greetings={settings.greetings}

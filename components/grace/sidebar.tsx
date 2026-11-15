@@ -100,7 +100,7 @@ export function Sidebar({
   onOpenProfile,
   onSignOut,
   features,
-  brandName = "Grace",
+  brandName = "GRACE AI",
 }: Props) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);

@@ -1,22 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/jetbrains-mono";
-import "@fontsource-variable/roboto";
-// The public page's two faces: a high-contrast serif for headlines and a
-// neutral grotesque for everything else. Loaded at the root so the marketing
-// route does not pay for a second stylesheet request, and so the fonts are
-// already resolved when the page's first paint happens.
-import "@fontsource/instrument-serif/400.css";
-import "@fontsource/instrument-serif/400-italic.css";
-import "@fontsource/instrument-sans/400.css";
-import "@fontsource/instrument-sans/500.css";
-import "@fontsource/instrument-sans/600.css";
 import "./globals.css";
 import { getSettings } from "@/lib/settings";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { brandName, tagline } = await getSettings();
-  const brand = brandName || "Grace";
+  const brand = brandName || "GRACE AI";
   const description = `${brand} is a calm, capable assistant for writing, thinking and building. ${tagline}`;
   const title = `${brand} — ${tagline}`;
 
