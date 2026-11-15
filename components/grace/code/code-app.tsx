@@ -12,7 +12,6 @@ import {
   MessagesSquare,
   Plus,
   Settings2,
-  Sparkles,
   Square,
   Trash2,
   Upload,
@@ -24,7 +23,6 @@ import { FileTree } from "@/components/grace/code/file-tree";
 import { GithubSheet } from "@/components/grace/code/github-sheet";
 import { GithubMark } from "@/components/grace/github-mark";
 import { GraceMark } from "@/components/grace/logo";
-import { ModelSheet, type CatalogModel } from "@/components/grace/model-sheet";
 import type { CodeMessage, Project, ProjectFile } from "@/lib/code/store";
 
 /**
@@ -38,8 +36,6 @@ import type { CodeMessage, Project, ProjectFile } from "@/lib/code/store";
 
 type Props = {
   initialProjects: Project[];
-  initialModels: CatalogModel[];
-  userModel: string | null;
 };
 
 type Panel = "chat" | "files" | "editor";
@@ -52,7 +48,7 @@ const LANGUAGES = [
   { id: "go", label: "Go" },
 ];
 
-export function CodeApp({ initialProjects, initialModels, userModel }: Props) {
+export function CodeApp({ initialProjects }: Props) {
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [activeId, setActiveId] = useState<string | null>(initialProjects[0]?.id ?? null);
   const [project, setProject] = useState<Project | null>(initialProjects[0] ?? null);
@@ -76,12 +72,6 @@ export function CodeApp({ initialProjects, initialModels, userModel }: Props) {
   const [showSettings, setShowSettings] = useState(false);
   const [githubOpen, setGithubOpen] = useState(false);
   const [pushing, setPushing] = useState(false);
-
-  // Model choice is per session, like chat: pick once and every turn after uses
-  // it. Auto means "let Grace pick the strongest coding model available".
-  const [models] = useState<CatalogModel[]>(initialModels);
-  const [model, setModel] = useState<string | null>(userModel);
-  const [modelsOpen, setModelsOpen] = useState(false);
 
   // The OAuth callback returns to /code?github=…; the sheet was unmounted while
   // the browser was away on github.com, so reopen it and explain the result.
@@ -304,7 +294,6 @@ export function CodeApp({ initialProjects, initialModels, userModel }: Props) {
         body: JSON.stringify({
           projectId: project.id,
           message: text,
-          model,
           focus: pickedPath,
         }),
         signal: controller.signal,
@@ -640,18 +629,7 @@ export function CodeApp({ initialProjects, initialModels, userModel }: Props) {
                   )}
                 </div>
 
-                <div className="mt-1.5 flex items-center gap-1.5 px-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setModelsOpen(true)}
-                    className="press flex h-6 items-center gap-1 rounded-full border border-hairline bg-control px-2 text-[11px] font-medium text-sub transition-colors hover:border-[#333338] hover:text-ink"
-                    aria-label={`Model: ${model ? (models.find((m) => m.id === model)?.name ?? model) : "Auto"}`}
-                  >
-                    <Sparkles size={10} className="text-accent" aria-hidden="true" />
-                    <span className="max-w-[150px] truncate">
-                      {model ? (models.find((m) => m.id === model)?.name ?? model) : "Auto"}
-                    </span>
-                  </button>
+                <div className="mt-1.5 flex items-center px-0.5">
                   <span className="min-w-0 flex-1 truncate text-right text-[10.5px] leading-4 text-muted">
                     Files are replaced whole. Review what changed.
                   </span>
@@ -741,19 +719,6 @@ export function CodeApp({ initialProjects, initialModels, userModel }: Props) {
       {creating && (
         <NewProjectDialog onCancel={() => setCreating(false)} onCreate={createProject} />
       )}
-
-      <ModelSheet
-        open={modelsOpen}
-        onClose={() => setModelsOpen(false)}
-        models={models}
-        selected={model}
-        onSelect={(id) => {
-          setModel(id);
-          setModelsOpen(false);
-        }}
-        anyConfigured={models.some((m) => m.available)}
-        isAdmin={false}
-      />
 
       <GithubSheet
         open={githubOpen}

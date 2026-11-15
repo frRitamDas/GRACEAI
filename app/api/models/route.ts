@@ -4,12 +4,14 @@ import { PROVIDERS } from "@/lib/ai/catalog";
 import { cachedCatalog, storeCatalog } from "@/lib/ai/catalog-cache";
 import { loadCatalog } from "@/lib/ai/discovery";
 import { getProviderStatus } from "@/lib/ai/env";
+import { getCurrentUser } from "@/lib/auth/session";
+import { allowedCatalog, getSettings } from "@/lib/settings";
 
 /**
  * The model catalog.
  *
  * Providers report whether a key exists, never the key itself. Models are
- * discovered live once a key is present, so the picker shows what the provider
+ * discovered live once a key is present, so the console shows what the provider
  * actually serves — including which models cost nothing — with the owner's
  * edits applied on top.
  *
@@ -17,6 +19,10 @@ import { getProviderStatus } from "@/lib/ai/env";
  * cached for two minutes in `lib/ai/catalog-cache`. That cache is cleared by any
  * owner edit, so a hide or a reprice takes effect immediately; `?fresh=1` skips
  * it entirely.
+ *
+ * Users never see this list. Only the owner may read it, because it names the
+ * labs behind Grace and that is exactly what the product keeps out of the user's
+ * way. Anonymous callers get the count-free public shape instead.
  */
 
 /**
@@ -33,7 +39,8 @@ const HEADERS = {
 export async function GET(request: Request) {
   const fresh = new URL(request.url).searchParams.get("fresh") === "1";
 
-  const [status, catalog] = await Promise.all([
+  const [user, status, catalog, settings] = await Promise.all([
+    getCurrentUser(),
     getProviderStatus(),
     (async () => {
       if (!fresh) {
@@ -44,9 +51,23 @@ export async function GET(request: Request) {
       storeCatalog(built);
       return built;
     })(),
+    getSettings(),
   ]);
 
   const ready = new Set(status.filter((s) => s.configured).map((s) => s.id));
+
+  // Not the owner: no ids, no names, no providers. Just whether Grace can answer.
+  if (!user?.isAdmin) {
+    return new NextResponse(
+      JSON.stringify({
+        anyConfigured: ready.size > 0,
+        available: ready.size > 0 && settings.chatEnabled,
+      }),
+      { status: 200, headers: HEADERS }
+    );
+  }
+
+  const eligible = allowedCatalog(settings, catalog.models, new Set(catalog.models.map((m) => m.provider)));
 
   const body = JSON.stringify({
     providers: status,
@@ -61,10 +82,12 @@ export async function GET(request: Request) {
       blurb: m.blurb,
       free: Boolean(m.free),
       available: ready.size === 0 ? true : ready.has(m.provider),
+      allowed: eligible.some((e) => e.id === m.id) && !settings.hiddenModels.includes(m.id),
     })),
     freeCount: catalog.models.filter((m) => m.free).length,
     liveProviders: catalog.live,
     anyConfigured: ready.size > 0,
+    pinned: settings.chatModel || null,
   });
 
   return new NextResponse(body, { status: 200, headers: HEADERS });

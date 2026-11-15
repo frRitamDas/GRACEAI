@@ -11,8 +11,6 @@ export type ChatMessage = {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
-  modelName?: string | null;
-  providerLabel?: string | null;
   credits?: number;
   attachments?: { name: string; mime: string }[];
   error?: boolean;
@@ -114,16 +112,10 @@ export function MessageRow({
           </div>
         )}
 
-        {(message.modelName || message.content) && (
+        {message.content && (
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-muted">
-            {message.modelName && (
-              <span className="inline-flex items-center gap-1">
-                {message.modelName}
-                {message.providerLabel ? ` · ${message.providerLabel}` : ""}
-              </span>
-            )}
-            {message.content && <CopyButton text={message.content} />}
-            {message.content && isLast && onRetry && (
+            <CopyButton text={message.content} />
+            {isLast && onRetry && (
               <button
                 type="button"
                 onClick={onRetry}

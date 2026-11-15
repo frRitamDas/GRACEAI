@@ -11,6 +11,7 @@ import {
   setWorkspaceRepo,
   writeWorkspaceFile,
 } from "@/lib/workspace/store";
+import { featureEnabled } from "@/lib/settings";
 
 /**
  * A chat's workspace: an optional repository plus the files that came with it.
@@ -26,6 +27,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(_request: Request, { params }: Params) {
   const user = await getCurrentUser();
   if (!user) return jsonError("Sign in first.", 401);
+  if (!(await featureEnabled("graceCode"))) return jsonError("Grace Code is turned off on this deployment.", 403, { code: "feature_off" });
 
   const { id } = await params;
   const conversation = await getConversation(user.id, id);
@@ -51,6 +53,7 @@ const attachSchema = z.object({
 export async function PUT(request: Request, { params }: Params) {
   const user = await getCurrentUser();
   if (!user) return jsonError("Sign in first.", 401);
+  if (!(await featureEnabled("graceCode"))) return jsonError("Grace Code is turned off on this deployment.", 403, { code: "feature_off" });
 
   const { id } = await params;
   const conversation = await getConversation(user.id, id);

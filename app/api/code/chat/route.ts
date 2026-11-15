@@ -5,6 +5,7 @@ import { clientKey, jsonError, rateLimit } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getProject, listFiles, listMessages, addMessage, runCodeTurn } from "@/lib/code/store";
 import { recordUsage } from "@/lib/db/store";
+import { featureEnabled } from "@/lib/settings";
 
 /**
  * The Grace Code agent turn.
@@ -22,14 +23,15 @@ export const maxDuration = 300;
 const schema = z.object({
   projectId: z.string().min(1).max(64),
   message: z.string().trim().min(1).max(20_000),
-  model: z.string().max(120).nullable().optional(),
   /** File the user has open: the agent reads that one first. */
   focus: z.string().max(400).nullable().optional(),
-});
+}).strict();
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return jsonError("Sign in to use Grace Code.", 401);
+  if (!(await featureEnabled("graceCode"))) return jsonError("Grace Code is turned off on this deployment.", 403, { code: "feature_off" });
+  if (!(await featureEnabled("projects"))) return jsonError("Projects are turned off on this deployment.", 403, { code: "feature_off" });
 
   const limited = await rateLimit(clientKey(request, user.id), 40, 60_000);
   if (!limited.ok) return jsonError("Too many requests. Give it a moment.", 429);
@@ -76,7 +78,6 @@ export async function POST(request: Request) {
           files,
           history,
           prompt: body.message,
-          preferredModel: body.model ?? user.model,
           focus: body.focus ?? null,
           signal: request.signal,
         })) {

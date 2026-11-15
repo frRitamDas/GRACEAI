@@ -7,7 +7,7 @@ import { UPCOMING } from "@/lib/upcoming";
 
 export const instant = false;
 
-export const metadata = { title: "Upcoming — Grace" };
+export const metadata = { title: "Upcoming" };
 
 export default async function UpcomingPage() {
   const user = await getCurrentUser();

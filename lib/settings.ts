@@ -1,5 +1,7 @@
 import "server-only";
 
+import { connection } from "next/server";
+
 import { localMode, nowIso, readLocalDb, withLocalDb } from "@/lib/db/local";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
@@ -27,6 +29,12 @@ export type DeploymentSettings = {
   greetings: [string, string, string];
   /** Announcement banner: null when hidden. */
   announcement: { id: string; text: string; href: string } | null;
+  /**
+   * The model that answers every chat turn. The owner sets it once so users
+   * never see or choose a model. Empty means "let effort decide" from the
+   * allowed set.
+   */
+  chatModel: string;
   /** Model ids the router may use, in preference order. Empty = the catalog. */
   allowedModels: string[];
   /** Models hidden from the owner's own pickers (kept for read-only telemetry). */
@@ -58,6 +66,7 @@ export const DEFAULT_SETTINGS: DeploymentSettings = {
   announcement: null,
   allowedModels: [],
   hiddenModels: [],
+  chatModel: "",
   footerNote: "Grace can make mistakes.",
   features: {
     graceCode: true,
@@ -80,6 +89,7 @@ export type SettingsPatch = Partial<
     | "signupEnabled"
     | "greetings"
     | "announcement"
+    | "chatModel"
     | "allowedModels"
     | "hiddenModels"
     | "footerNote"
@@ -100,6 +110,12 @@ function merge(base: DeploymentSettings, patch: Partial<DeploymentSettings>): De
 }
 
 export async function getSettings(): Promise<DeploymentSettings> {
+  // These are the console's switches. They are read at request time, never baked
+  // into a prerendered page, or a banner the owner removed would keep showing
+  // until the next deploy. `connection()` is also what keeps the short cache
+  // below from being evaluated during a static pass.
+  await connection();
+
   if (cache && Date.now() - cache.at < CACHE_MS) return cache.value;
 
   let value: DeploymentSettings = DEFAULT_SETTINGS;
@@ -117,6 +133,11 @@ export async function getSettings(): Promise<DeploymentSettings> {
 
   cache = { at: Date.now(), value };
   return value;
+}
+
+/** Read a feature switch at request time for API guards. */
+export async function featureEnabled(feature: keyof DeploymentSettings["features"]): Promise<boolean> {
+  return (await getSettings()).features[feature];
 }
 
 export async function saveSettings(patch: SettingsPatch): Promise<DeploymentSettings> {
@@ -152,6 +173,28 @@ export function modelAllowed(settings: DeploymentSettings, id: string): boolean 
     return !settings.hiddenModels.includes(id);
   }
   return settings.allowedModels.includes(id) && !settings.hiddenModels.includes(id);
+}
+
+/**
+ * Every model id that may answer, restricted to the ones the deployment can
+ * actually reach. With no allowlist this is the whole reachable catalog minus
+ * hidden models; with one it is the allowlist filtered the same way.
+ */
+export function allowedCatalog<T extends { id: string; provider: string }>(
+  settings: DeploymentSettings,
+  catalog: T[],
+  reachable: Set<string>
+): T[] {
+  // Hidden always means unavailable. If an allowlist names only models that
+  // cannot be reached, fall back to other reachable, non-hidden models; never
+  // resurrect a hidden model just to avoid an empty result.
+  const available = catalog.filter(
+    (model) => reachable.has(model.provider) && !settings.hiddenModels.includes(model.id)
+  );
+  const selected = available.filter((model) => modelAllowed(settings, model.id));
+  // An allowlist naming only unreachable models must not strand the deploy:
+  // fall back to other reachable, non-hidden models, never to hidden ones.
+  return selected.length > 0 ? selected : available;
 }
 
 /** Replace `{name}` in a greeting, and nothing else. */

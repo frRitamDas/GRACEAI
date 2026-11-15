@@ -2,15 +2,18 @@ import { redirect } from "next/navigation";
 
 import { ProjectsView } from "@/components/grace/projects-view";
 import { getCurrentUser } from "@/lib/auth/session";
+import { getSettings } from "@/lib/settings";
 import { listFiles, listProjects } from "@/lib/code/store";
 
 export const instant = false;
 
-export const metadata = { title: "Projects — Grace" };
+export const metadata = { title: "Projects" };
 
 export default async function ProjectsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/welcome");
+  // The owner can remove this surface. A URL is not a way around that.
+  if (!(await getSettings()).features.projects) redirect("/");
 
   const projects = await listProjects(user.id);
   // File counts are only meaningful for the few dozen a person owns; cap the

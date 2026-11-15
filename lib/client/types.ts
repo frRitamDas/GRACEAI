@@ -7,8 +7,6 @@ export type SessionUserView = {
   plan: string;
   credits: number;
   effort: number;
-  provider: string;
-  model: string | null;
   showCreditPercentage: boolean;
 };
 

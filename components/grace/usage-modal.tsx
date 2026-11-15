@@ -25,6 +25,7 @@ type Props = {
   onTogglePercentage: (next: boolean) => void;
   onBuyCredits: () => Promise<void> | void;
   onBuyApex: () => Promise<void> | void;
+  apexEnabled?: boolean;
 };
 
 const PLAN_LABEL: Record<string, string> = {
@@ -49,6 +50,7 @@ export function UsageModal({
   onTogglePercentage,
   onBuyCredits,
   onBuyApex,
+  apexEnabled = true,
 }: Props) {
   const [busy, setBusy] = useState<"credits" | "apex" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -122,15 +124,17 @@ export function UsageModal({
             />
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => void run("apex")}
-              disabled={busy !== null}
-              className="press h-[52px] rounded-full border border-accent/60 bg-accent-soft text-[15px] font-bold text-accent-text hover:bg-accent/[0.18] disabled:opacity-60"
-            >
-              {busy === "apex" ? "Opening…" : "Buy Apex"}
-            </button>
+          <div className={`mt-3 grid gap-3 ${apexEnabled ? "grid-cols-2" : "grid-cols-1"}`}>
+            {apexEnabled && (
+              <button
+                type="button"
+                onClick={() => void run("apex")}
+                disabled={busy !== null}
+                className="press h-[52px] rounded-full border border-accent/60 bg-accent-soft text-[15px] font-bold text-accent-text hover:bg-accent/[0.18] disabled:opacity-60"
+              >
+                {busy === "apex" ? "Opening…" : "Buy Apex"}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => void run("credits")}

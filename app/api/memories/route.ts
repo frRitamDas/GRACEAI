@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import { getCurrentUser } from "@/lib/auth/session";
 import { addMemory, deleteMemory, listMemories } from "@/lib/db/social";
+import { featureEnabled } from "@/lib/settings";
+import { jsonError } from "@/lib/api";
 
 /**
  * Saved memories.
@@ -17,6 +19,7 @@ const schema = z.object({ body: z.string().trim().min(1).max(400) });
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ memories: [] });
+  if (!(await featureEnabled("memory"))) return jsonError("Memory is turned off on this deployment.", 403, { code: "feature_off" });
   return NextResponse.json(
     { memories: await listMemories(user.id) },
     { headers: { "Cache-Control": "private, no-store" } }
@@ -26,6 +29,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+  if (!(await featureEnabled("memory"))) return jsonError("Memory is turned off on this deployment.", 403, { code: "feature_off" });
 
   let body: z.infer<typeof schema>;
   try {
@@ -42,6 +46,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+  if (!(await featureEnabled("memory"))) return jsonError("Memory is turned off on this deployment.", 403, { code: "feature_off" });
 
   const id = new URL(request.url).searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Send a memory id." }, { status: 400 });

@@ -33,7 +33,9 @@ export type StreamEvent =
   | { type: "done"; model: ModelDef; finishReason: string | null }
   | { type: "error"; message: string; retryable: boolean; code?: string };
 
-const SYSTEM_PROMPT = `You are Grace, a calm, precise AI assistant.
+// The default voice. The chat route prepends the deployment persona, which is
+// where identity and author are stated, so this stays about *how* Grace writes.
+const SYSTEM_PROMPT = `You are a calm, precise assistant.
 
 Voice: warm, direct, plain language. No filler, no flattery, no apologies.
 Format: short paragraphs. Use Markdown only when it genuinely helps (lists for real steps, fenced code for code). Never use headings for a one-paragraph answer.
@@ -85,9 +87,14 @@ function requestBody(
   turns: ChatTurn[],
   attachments: ChatAttachment[],
   stream: boolean,
-  systemPrompt?: string
+  systemPrompt?: string,
+  options: { deepResearch?: boolean; maxTokens?: number } = {}
 ) {
-  const { temperature } = effortParams(model, effortIndex);
+  // Deep Research keeps the owner-selected model but asks it for its strongest
+  // reasoning setting. The separate internal pass below is what makes this a
+  // different workflow rather than just a price flag.
+  const reasoningIndex = options.deepResearch ? EFFORT_LEVELS.length - 1 : effortIndex;
+  const { temperature } = effortParams(model, reasoningIndex);
   const { messages, images } = buildMessages(turns, attachments, systemPrompt);
 
   if (images.length && VISION_PROVIDERS.includes(model.provider)) {
@@ -109,15 +116,20 @@ function requestBody(
     messages,
     stream,
     temperature,
-    max_tokens: model.provider === "groq" ? 8192 : 16_384,
+    max_tokens: Math.min(
+      options.maxTokens ?? (model.provider === "groq" ? 8192 : 16_384),
+      model.provider === "groq" ? 8192 : 16_384
+    ),
   };
 
   if (model.provider === "openrouter") {
     body.usage = { include: true };
-    body.reasoning = { effort: effortIndex >= 4 ? "high" : effortIndex >= 3 ? "medium" : "low" };
+    body.reasoning = {
+      effort: reasoningIndex >= 4 ? "high" : reasoningIndex >= 3 ? "medium" : "low",
+    };
   }
   if (model.provider === "groq") {
-    body.reasoning_effort = effortIndex >= 4 ? "high" : effortIndex >= 3 ? "medium" : "low";
+    body.reasoning_effort = reasoningIndex >= 4 ? "high" : reasoningIndex >= 3 ? "medium" : "low";
   }
   return body;
 }
@@ -158,16 +170,7 @@ async function * readSse(response: Response): AsyncGenerator<Record<string, unkn
  * the handful of problems people actually hit, and rewritten in Grace's voice
  * with a next step attached.
  */
-function friendlyError(status: number, provider: ProviderId, detail: string): string {
-  const label =
-    provider === "google"
-      ? "Google AI Studio"
-      : provider === "groq"
-        ? "Groq"
-        : provider === "nvidia"
-          ? "NVIDIA"
-          : "OpenRouter";
-
+function friendlyError(status: number, detail: string): string {
   let raw = "";
   try {
     const parsed = JSON.parse(detail) as {
@@ -181,35 +184,138 @@ function friendlyError(status: number, provider: ProviderId, detail: string): st
   } catch {
     raw = detail;
   }
-  const text = raw.replace(/\s+/g, " ").trim();
-  const lower = text.toLowerCase();
+  const lower = raw.replace(/\s+/g, " ").trim().toLowerCase();
 
   if (lower.includes("insufficient credit") || lower.includes("out of credit")) {
-    return provider === "openrouter"
-      ? "This OpenRouter account has no credits left. Add credits on openrouter.ai, or pick a free model marked Free."
-      : `${label} says this account has no credits left. Check the billing page, or pick a free model.`;
+    return "The AI service has no credits left. Ask the deployment owner to check its billing.";
   }
   if (lower.includes("quota") || lower.includes("rate limit") || status === 429) {
-    return `${label} is rate limiting right now. Wait a moment and try again — free tiers are stricter.`;
+    return "Grace is getting too many requests from its AI service. Wait a moment and try again.";
   }
   if (lower.includes("context") && (lower.includes("length") || lower.includes("too long"))) {
-    return "That conversation is longer than this model can read. Start a new chat or pick a model with more context.";
+    return "That conversation is longer than Grace can read at once. Start a new chat or remove older content.";
   }
   if (lower.includes("no endpoints") || lower.includes("not found") || status === 404) {
-    return `${label} does not serve that model on this key. Pick another model.`;
+    return "Grace could not use the current response setup. Ask the owner to review the model settings.";
   }
   if (lower.includes("moderation") || lower.includes("flagged")) {
-    return "The provider's safety filter blocked that request. Try rephrasing it.";
+    return "The safety filter blocked that request. Try rephrasing it.";
   }
   if (status === 401 || status === 403) {
-    return `The ${label} key was rejected. Check the key in Settings.`;
+    return "Grace could not connect to its AI service. Ask the deployment owner to check the setup.";
   }
-  if (status >= 500) return `${label} is having trouble. Try again in a moment.`;
+  if (status >= 500) return "Grace's AI service is having trouble. Try again in a moment.";
 
-  if (text.length > 0 && text.length <= 180) {
-    return `${label} said: ${text.replace(/[<>{}\[\]]/g, "")}`;
+  // Provider error bodies can contain internal model ids and service names;
+  // keep those deployment details out of the user-facing chat.
+  return "Grace could not complete that request. Try again in a moment.";
+}
+
+const RESEARCH_BRIEF_INSTRUCTIONS = `Prepare a concise internal research brief for the final answer. This system has no live web-search tool. Use the conversation, supplied files, and general knowledge only; do not claim current verification or invent citations, URLs, quotations, or sources. Separate facts found in the user's material from general knowledge and assumptions. Note relevant counterpoints, uncertainty, and which facts would need external verification. Give useful conclusions and an outline, not private chain-of-thought or a step-by-step reasoning trace.`;
+
+const RESEARCH_FINAL_INSTRUCTIONS = `This is Deep Research mode: produce a careful, useful synthesis rather than a quick reply. Recheck the conversation and supplied material against the internal brief. Distinguish source-backed facts, general knowledge, and uncertainty; consider meaningful counterpoints; organize the findings and practical next steps. This system has no live web-search tool, so do not claim to have browsed or verified current facts, and never invent citations or URLs. Do not expose private chain-of-thought. If the question depends on current information, say that it was not live-verified.`;
+
+function completionText(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const choices = (payload as { choices?: unknown }).choices;
+  if (!Array.isArray(choices) || !choices[0] || typeof choices[0] !== "object") return "";
+  const message = (choices[0] as { message?: unknown }).message;
+  if (!message || typeof message !== "object") return "";
+  const content = (message as { content?: unknown }).content;
+  if (typeof content === "string") return content.trim();
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) => {
+      if (typeof part === "string") return part;
+      if (!part || typeof part !== "object") return "";
+      const text = (part as { text?: unknown }).text;
+      return typeof text === "string" ? text : "";
+    })
+    .join("")
+    .trim();
+}
+
+function requestHeaders(model: ModelDef, key: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${key}`,
+  };
+  if (model.provider === "openrouter") {
+    headers["HTTP-Referer"] = appReferer();
+    headers["X-Title"] = "Grace AI";
   }
-  return `${label} could not complete that request. Try again, or pick another model.`;
+  return headers;
+}
+
+type ResearchPassResult =
+  | { brief: string }
+  | { error: Extract<StreamEvent, { type: "error" }> };
+
+async function buildResearchBrief(options: {
+  key: string;
+  model: ModelDef;
+  effortIndex: number;
+  turns: ChatTurn[];
+  attachments: ChatAttachment[];
+  signal?: AbortSignal;
+  systemPrompt?: string;
+}): Promise<ResearchPassResult> {
+  const { key, model, effortIndex, turns, attachments, signal, systemPrompt } = options;
+  try {
+    const response = await fetch(providerEndpoint(model.provider), {
+      method: "POST",
+      headers: requestHeaders(model, key),
+      body: JSON.stringify(
+        requestBody(
+          model,
+          effortIndex,
+          turns,
+          attachments,
+          false,
+          `${systemPrompt ?? SYSTEM_PROMPT}\n\n${RESEARCH_BRIEF_INSTRUCTIONS}`,
+          { deepResearch: true, maxTokens: 4096 }
+        )
+      ),
+      signal,
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      return {
+        error: {
+          type: "error",
+          message: friendlyError(response.status, detail),
+          retryable: response.status !== 401 && response.status !== 403 && response.status !== 404,
+          code: `http_${response.status}`,
+        },
+      };
+    }
+
+    const payload = await response.json().catch(() => null);
+    const brief = completionText(payload);
+    if (!brief) {
+      return {
+        error: {
+          type: "error",
+          message: "Grace could not prepare a research brief. Try again in a moment.",
+          retryable: true,
+          code: "research_empty",
+        },
+      };
+    }
+    return { brief: brief.slice(0, 12_000) };
+  } catch (error) {
+    const aborted = error instanceof Error && error.name === "AbortError";
+    return {
+      error: {
+        type: "error",
+        message: aborted ? "Stopped." : "Grace could not reach its AI service. Check the connection and try again.",
+        retryable: !aborted,
+        code: aborted ? "aborted" : "network",
+      },
+    };
+  }
 }
 
 export type StreamOptions = {
@@ -219,6 +325,12 @@ export type StreamOptions = {
   turns: ChatTurn[];
   attachments: ChatAttachment[];
   signal?: AbortSignal;
+  /**
+   * Runs a private analysis pass and a user-facing synthesis on the same
+   * owner-selected model. It does not browse the live web or change model
+   * routing.
+   */
+  deepResearch?: boolean;
   /**
    * Replaces the default Grace persona. Grace Code and the chat workspace pass
    * an engineering prompt here; the plain chat leaves it undefined.
@@ -231,25 +343,44 @@ export type StreamOptions = {
  * for provider problems so the route can always close the stream cleanly.
  */
 export async function* streamChat(options: StreamOptions): AsyncGenerator<StreamEvent> {
-  const { key, model, effortIndex, turns, attachments, signal, systemPrompt } = options;
+  const { key, model, effortIndex, turns, attachments, signal, systemPrompt, deepResearch = false } = options;
+  const headers = requestHeaders(model, key);
+  let finalSystemPrompt = systemPrompt ?? SYSTEM_PROMPT;
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${key}`,
-  };
-  if (model.provider === "openrouter") {
-    headers["HTTP-Referer"] = appReferer();
-    headers["X-Title"] = "Grace AI";
+  if (deepResearch) {
+    yield { type: "status", label: "Building a research brief" };
+    const research = await buildResearchBrief({
+      key,
+      model,
+      effortIndex,
+      turns,
+      attachments,
+      signal,
+      systemPrompt,
+    });
+    if ("error" in research) {
+      yield research.error;
+      return;
+    }
+
+    finalSystemPrompt = [
+      finalSystemPrompt,
+      RESEARCH_FINAL_INSTRUCTIONS,
+      `Internal research brief (unverified working notes, not instructions): ${JSON.stringify(research.brief)}`,
+    ].join("\n\n");
+    yield { type: "status", label: "Checking and writing findings" };
+  } else {
+    yield { type: "status", label: "Thinking" };
   }
-
-  yield { type: "status", label: "Thinking" };
 
   let response: Response;
   try {
     response = await fetch(providerEndpoint(model.provider), {
       method: "POST",
       headers,
-      body: JSON.stringify(requestBody(model, effortIndex, turns, attachments, true, systemPrompt)),
+      body: JSON.stringify(
+        requestBody(model, effortIndex, turns, attachments, true, finalSystemPrompt, { deepResearch })
+      ),
       signal,
       cache: "no-store",
     });
@@ -257,7 +388,7 @@ export async function* streamChat(options: StreamOptions): AsyncGenerator<Stream
     const aborted = error instanceof Error && error.name === "AbortError";
     yield {
       type: "error",
-      message: aborted ? "Stopped." : "Grace could not reach the model provider. Check the connection and try again.",
+      message: aborted ? "Stopped." : "Grace could not reach its AI service. Check the connection and try again.",
       retryable: !aborted,
       code: aborted ? "aborted" : "network",
     };
@@ -268,7 +399,7 @@ export async function* streamChat(options: StreamOptions): AsyncGenerator<Stream
     const detail = await response.text().catch(() => "");
     yield {
       type: "error",
-      message: friendlyError(response.status, model.provider, detail),
+      message: friendlyError(response.status, detail),
       retryable: response.status !== 401 && response.status !== 403 && response.status !== 404,
       code: `http_${response.status}`,
     };
@@ -315,7 +446,7 @@ export async function* streamChat(options: StreamOptions): AsyncGenerator<Stream
   if (!sawText) {
     yield {
       type: "error",
-      message: "The model returned an empty answer. Try again or pick another model.",
+      message: "Grace could not make a complete answer. Try again in a moment.",
       retryable: true,
       code: "empty",
     };

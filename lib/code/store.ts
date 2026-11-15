@@ -8,12 +8,14 @@ import {
   readLocalDb,
   withLocalDb,
 } from "@/lib/db/local";
-import { getModel, type ModelDef } from "@/lib/ai/catalog";
+import type { ModelDef } from "@/lib/ai/catalog";
 import { cachedCatalog, storeCatalog } from "@/lib/ai/catalog-cache";
 import { loadCatalog } from "@/lib/ai/discovery";
 import { getProviderKey } from "@/lib/ai/env";
 import { streamChat, type ChatTurn } from "@/lib/ai/chat";
 import { codingSystemPrompt, extractFileBlocks } from "@/lib/ai/coding";
+import { graceCodePersona } from "@/lib/ai/persona";
+import { allowedCatalog, getSettings } from "@/lib/settings";
 
 /**
  * Grace Code: projects, and the rules the agent works under.
@@ -559,26 +561,28 @@ export function extractPatches(
   };
 }
 
-async function pickCodeModel(preferred: string | null): Promise<{ model: ModelDef; key: string } | null> {
+async function pickCodeModel(): Promise<{ model: ModelDef; key: string } | null> {
   const cached = cachedCatalog();
   const catalog = cached ?? (await (async () => {
     const built = await loadCatalog();
     storeCatalog(built);
     return built;
   })());
-  const candidates: ModelDef[] = [];
-  if (preferred) {
-    const chosen = getModel(preferred, catalog.models);
-    if (chosen) candidates.push(chosen);
-  }
-  // Coding wants reasoning, but availability beats preference: try the strongest
-  // models first and fall back to whatever the deployment can actually reach.
-  candidates.push(
-    ...catalog.models
+
+  // The console's allowlist applies to Code as well: if the owner has turned a
+  // model off, no entry point may route to it.
+  const settings = await getSettings();
+  const reachable = new Set(catalog.models.map((m) => m.provider));
+  const eligible = allowedCatalog(settings, catalog.models, reachable);
+
+  // Coding wants reasoning: try stronger paid models first, then free models.
+  // User requests cannot override the owner-controlled availability settings.
+  const candidates: ModelDef[] = [
+    ...eligible
       .filter((m) => m.tier >= 3 && !m.free)
-      .sort((a, b) => b.tier - a.tier || a.credits - b.credits)
-  );
-  candidates.push(...catalog.models.filter((m) => m.free).sort((a, b) => b.tier - a.tier));
+      .sort((a, b) => b.tier - a.tier || a.credits - b.credits),
+    ...eligible.filter((m) => m.free).sort((a, b) => b.tier - a.tier),
+  ];
 
   for (const model of candidates) {
     const key = await getProviderKey(model.provider);
@@ -588,7 +592,6 @@ async function pickCodeModel(preferred: string | null): Promise<{ model: ModelDe
 }
 
 export type CodeStreamEvent =
-  | { type: "meta"; modelName: string; patches: string[] }
   | { type: "status"; label: string }
   | { type: "delta"; text: string }
   | { type: "done"; message: CodeMessage; applied: string[] }
@@ -606,14 +609,13 @@ export async function* runCodeTurn(options: {
   files: ProjectFile[];
   history: CodeMessage[];
   prompt: string;
-  preferredModel: string | null;
   /** File the user is looking at, so the agent reads it first. */
   focus?: string | null;
   signal?: AbortSignal;
 }): AsyncGenerator<CodeStreamEvent> {
-  const { project, files, history, prompt, preferredModel, focus, signal } = options;
+  const { project, files, history, prompt, focus, signal } = options;
 
-  const picked = await pickCodeModel(preferredModel);
+  const picked = await pickCodeModel();
   if (!picked) {
     yield {
       type: "error",
@@ -628,8 +630,6 @@ export async function* runCodeTurn(options: {
     { role: "user", content: prompt },
   ];
 
-  yield { type: "meta", modelName: picked.model.name, patches: files.map((f) => f.path) };
-
   let reply = "";
   for await (const event of streamChat({
     key: picked.key,
@@ -638,7 +638,7 @@ export async function* runCodeTurn(options: {
     effortIndex: 3,
     turns,
     attachments: [],
-    systemPrompt: systemPrompt(project, files, focus),
+    systemPrompt: `${graceCodePersona()}\n\n${systemPrompt(project, files, focus)}`,
     signal,
   })) {
     if (event.type === "status") yield { type: "status", label: event.label };

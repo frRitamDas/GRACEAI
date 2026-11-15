@@ -25,12 +25,12 @@ export function Toggle({
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={`relative h-[26px] w-[46px] shrink-0 rounded-full transition-colors duration-200 disabled:opacity-50 ${
-        checked ? "bg-ink" : "bg-[#3a3a3f]"
+        checked ? "bg-accent" : "bg-[#3a3a3f]"
       }`}
     >
       <span
         className={`absolute top-1/2 h-[20px] w-[20px] -translate-y-1/2 rounded-full transition-all duration-200 ${
-          checked ? "left-[24px] bg-[#0b0b0c]" : "left-[3px] bg-[#e9e9ec]"
+          checked ? "left-[24px] bg-white" : "left-[3px] bg-[#e9e9ec]"
         }`}
       />
     </button>

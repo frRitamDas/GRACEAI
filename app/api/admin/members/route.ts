@@ -63,8 +63,9 @@ export async function POST(request: Request) {
 
   // One endpoint, two shapes: membership grants and role changes.
   if (raw.action === "promote" || raw.action === "demote") {
-    const body = await parseJson(request, roleSchema);
-    if (body instanceof NextResponse) return body;
+    const parsed = await parseJson(request, roleSchema);
+    if (parsed instanceof NextResponse) return parsed;
+    const body = parsed as z.infer<typeof roleSchema>;
 
     const target = await findUserByEmail(body.email);
     if (!target) return jsonError("No Grace account uses that email.", 404);
@@ -80,8 +81,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ member: updated });
   }
 
-  const body = await parseJson(request, grantSchema);
-  if (body instanceof NextResponse) return body;
+  const parsedGrant = await parseJson(request, grantSchema);
+  if (parsedGrant instanceof NextResponse) return parsedGrant;
+  const body = parsedGrant as z.infer<typeof grantSchema>;
 
   const target = await findUserByEmail(body.email);
   if (!target) return jsonError("No Grace account uses that email.", 404);
@@ -90,7 +92,7 @@ export async function POST(request: Request) {
   const updated = await updateUser(target.id, {
     plan,
     // An owner account is unlimited by design; revoking must not remove that.
-    unlimited: target.is_admin ? true : body.action === "grant",
+    unlimited: target.isAdmin ? true : body.action === "grant",
     ...(body.action === "grant" ? { credits: Math.max(target.credits, 3_000) } : {}),
   });
   if (!updated) return jsonError("That change did not save.", 500);

@@ -40,6 +40,16 @@ type NavItem = {
   icon: React.ReactNode;
   /** A count or badge shown at the right edge. */
   badge?: React.ReactNode;
+  /** The deployment switch that governs this destination, if any. */
+  feature?: keyof SidebarFeatures;
+};
+
+/** Which destinations the owner has left switched on. */
+export type SidebarFeatures = {
+  projects: boolean;
+  memory: boolean;
+  apex: boolean;
+  graceCode: boolean;
 };
 
 type Props = {
@@ -60,6 +70,8 @@ type Props = {
   onSignOut: () => void;
   /** Opens the floating chat panel. Only rendered when chat is docked. */
   onOpenChat?: () => void;
+  features?: SidebarFeatures;
+  brandName?: string;
 };
 
 /**
@@ -87,6 +99,8 @@ export function Sidebar({
   onOpenApex,
   onOpenProfile,
   onSignOut,
+  features,
+  brandName = "Grace",
 }: Props) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -98,14 +112,17 @@ export function Sidebar({
     if (renaming) renameRef.current?.focus();
   }, [renaming]);
 
-  const nav: NavItem[] = [
-    { href: "/projects", label: "Projects", icon: <LayoutGrid size={17} /> },
+  // Destinations the owner has removed never appear. Usage, Upcoming and
+  // Connections have no switch: they are part of every deployment.
+  const allNav: NavItem[] = [
+    { href: "/projects", label: "Projects", icon: <LayoutGrid size={17} />, feature: "projects" },
     { href: "/usage", label: "Usage & limits", icon: <Gauge size={17} />, badge: `${remainingPct}%` },
-    { href: "/memory", label: "Memory", icon: <Brain size={17} /> },
+    { href: "/memory", label: "Memory", icon: <Brain size={17} />, feature: "memory" },
     { href: "/upcoming", label: "Upcoming", icon: <Sparkles size={17} /> },
     { href: "/connections", label: "Connections", icon: <Blocks size={17} /> },
-    { href: "/apex", label: "Apex", icon: <Gem size={17} /> },
+    { href: "/apex", label: "Apex", icon: <Gem size={17} />, feature: "apex" },
   ];
+  const nav = allNav.filter((item) => !item.feature || !features || features[item.feature]);
 
   // Newest first, cut at a scannable length; the search sheet holds everything.
   const recent = useMemo(() => conversations.slice(0, 8), [conversations]);
@@ -115,7 +132,7 @@ export function Sidebar({
 
   return (
     <aside
-      aria-label="Grace navigation"
+      aria-label={`${brandName} navigation`}
       className={`relative z-30 hidden h-[100dvh] shrink-0 flex-col border-r border-hairline bg-black transition-[width] duration-200 ease-[var(--ease-out)] md:flex ${
         collapsed ? "w-[68px]" : "w-[264px]"
       }`}
@@ -125,8 +142,8 @@ export function Sidebar({
         <div className="flex h-[60px] shrink-0 items-center justify-center px-2">
           <Link
             href="/"
-            aria-label="Grace home"
-            title="Grace"
+            aria-label={`${brandName} home`}
+            title={brandName}
             className="press grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-[10px] bg-control"
           >
             <GraceMark className="h-[19px] w-[19px] shrink-0 text-[#d7d7da]" />
@@ -136,16 +153,16 @@ export function Sidebar({
         <div className="flex h-[60px] shrink-0 items-center gap-2.5 px-3.5">
           <Link
             href="/"
-            aria-label="Grace home"
+            aria-label={`${brandName} home`}
             className="press grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-[10px] bg-control"
           >
             <GraceMark className="h-[19px] w-[19px] shrink-0 text-[#d7d7da]" />
           </Link>
           <span className="flex min-w-0 flex-1 flex-col justify-center">
             <span className="text-[14.5px] font-semibold leading-[18px] tracking-[-0.01em] text-ink">
-              Grace
+              {brandName}
             </span>
-            <span className="text-[10.5px] leading-[14px] text-muted">Grace 3</span>
+            <span className="text-[10.5px] leading-[14px] text-muted">One assistant</span>
           </span>
           <button
             type="button"
@@ -351,18 +368,34 @@ export function Sidebar({
 
       {/* ----------------------------------------------------------- footer */}
       <div className={`shrink-0 space-y-1 border-t border-hairline py-2 ${collapsed ? "px-2" : "px-2.5"}`}>
-        <button
-          type="button"
-          onClick={onOpenApex}
-          title="Get Apex"
-          className={`press flex w-full items-center gap-2.5 rounded-[9px] bg-accent/[0.12] text-[13px] font-medium text-accent-text hover:bg-accent/[0.18] ${
-            collapsed ? "h-9 justify-center px-0" : "h-9 px-2.5"
-          }`}
-        >
-          <Sparkles size={16} className="shrink-0" aria-hidden="true" />
-          {!collapsed && <span className="truncate">Get Apex</span>}
-          {!collapsed && <ArrowUpRight size={13} className="ml-auto shrink-0 opacity-70" />}
-        </button>
+        {/* An owner already has everything, so selling them Apex is noise. They
+            get the console instead; everyone else keeps the upgrade path. */}
+        {user?.isAdmin ? (
+          <Link
+            href="/admin"
+            title="Open the console"
+            className={`press flex w-full items-center gap-2.5 rounded-[9px] bg-accent/[0.12] text-[13px] font-medium text-accent-text hover:bg-accent/[0.18] ${
+              collapsed ? "h-9 justify-center px-0" : "h-9 px-2.5"
+            }`}
+          >
+            <ShieldCheck size={16} className="shrink-0" aria-hidden="true" />
+            {!collapsed && <span className="truncate">Console</span>}
+            {!collapsed && <ArrowUpRight size={13} className="ml-auto shrink-0 opacity-70" />}
+          </Link>
+        ) : features?.apex !== false ? (
+          <button
+            type="button"
+            onClick={onOpenApex}
+            title="Get Apex"
+            className={`press flex w-full items-center gap-2.5 rounded-[9px] bg-accent/[0.12] text-[13px] font-medium text-accent-text hover:bg-accent/[0.18] ${
+              collapsed ? "h-9 justify-center px-0" : "h-9 px-2.5"
+            }`}
+          >
+            <Sparkles size={16} className="shrink-0" aria-hidden="true" />
+            {!collapsed && <span className="truncate">Get Apex</span>}
+            {!collapsed && <ArrowUpRight size={13} className="ml-auto shrink-0 opacity-70" />}
+          </button>
+        ) : null}
 
         {user?.isAdmin && (
           <Link
@@ -450,14 +483,6 @@ export function Sidebar({
                 >
                   <Settings2 size={14} aria-hidden="true" /> Account settings
                 </button>
-                <Link
-                  href="/settings"
-                  onClick={() => setMenuOpen(false)}
-                  role="menuitem"
-                  className="flex h-8 w-full items-center gap-2 rounded-[7px] px-2.5 text-[13px] text-sub hover:bg-white/[0.06] hover:text-ink"
-                >
-                  <Settings2 size={14} aria-hidden="true" /> Providers & models
-                </Link>
                 <div className="my-1 h-px bg-hairline" />
                 <button
                   type="button"

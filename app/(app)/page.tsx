@@ -3,12 +3,13 @@ import { redirect } from "next/navigation";
 import { ChatApp } from "@/components/grace/chat-app";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getProviderStatus } from "@/lib/ai/env";
-import { MODELS, PROVIDERS } from "@/lib/ai/catalog";
 import { loadShell } from "@/lib/shell";
+import { getSettings } from "@/lib/settings";
 
 /**
- * The chat. Effort, model and credits all come from the shell load, so this
- * page only has to add the model catalog and whether any provider is awake.
+ * The chat. Effort, credits and conversations come from the shell load; this
+ * page only adds the brand copy from the console and whether any provider is
+ * awake. No model is ever passed to the client: the owner picks it.
  */
 export const instant = false;
 
@@ -20,10 +21,11 @@ export default async function ChatPage({
   const user = await getCurrentUser();
   if (!user) redirect("/welcome");
 
-  const [shell, status, params] = await Promise.all([
+  const [shell, status, params, settings] = await Promise.all([
     loadShell(),
     getProviderStatus(),
     searchParams,
+    getSettings(),
   ]);
   if (!shell) redirect("/welcome");
 
@@ -38,25 +40,16 @@ export default async function ChatPage({
         plan: shell.user.plan,
         credits: shell.user.credits,
         effort: shell.account.effort,
-        provider: shell.account.provider,
-        model: shell.account.model,
         showCreditPercentage: shell.user.showCreditPercentage,
       }}
       initialUsage={shell.usage}
       initialConversations={shell.conversations}
-      initialModels={MODELS.map((m) => ({
-        id: m.id,
-        name: m.name,
-        provider: m.provider,
-        providerLabel: PROVIDERS[m.provider].label,
-        tier: m.tier,
-        credits: m.credits,
-        contextLabel: m.contextLabel,
-        blurb: m.blurb,
-        free: Boolean(m.free),
-        available: status.find((s) => s.id === m.provider)?.configured ?? false,
-      }))}
       anyConfigured={status.some((s) => s.configured)}
+      brandName={settings.brandName}
+      chatEnabled={settings.chatEnabled}
+      greetings={settings.greetings}
+      footerNote={settings.footerNote}
+      features={settings.features}
       initialConversationId={params.c ?? null}
     />
   );

@@ -10,30 +10,36 @@ import { Composer } from "@/components/grace/composer";
 import { EffortPanel } from "@/components/grace/effort-panel";
 import { Greeting } from "@/components/grace/greeting";
 import { MessageRow, ScrollToBottom, type ChatMessage } from "@/components/grace/message";
-import { ModelSheet, type CatalogModel } from "@/components/grace/model-sheet";
 import {
   WorkspacePanel,
   type WorkspaceFileInfo,
   type WorkspaceRepo,
 } from "@/components/grace/workspace-panel";
 import { UsageModal, type UsageData } from "@/components/grace/usage-modal";
-import { EFFORT_LEVELS, type ProviderId } from "@/lib/ai/catalog";
+import { EFFORT_LEVELS } from "@/lib/ai/catalog";
 import type { AttachmentView, ConversationSummary, SessionUserView } from "@/lib/client/types";
 
 type Props = {
   initialUser: SessionUserView;
   initialUsage: UsageData;
   initialConversations: ConversationSummary[];
-  initialModels: CatalogModel[];
   anyConfigured: boolean;
+  /** Product name from the deployment settings, so the header chip is the brand. */
+  brandName: string;
+  /** Whether the owner has chat switched on; off shows an honest paused state. */
+  chatEnabled: boolean;
+  greetings: [string, string, string];
+  footerNote: string;
+  features: {
+    graceCode: boolean;
+    projects: boolean;
+    memory: boolean;
+    apex: boolean;
+    attachments: boolean;
+    deepResearch: boolean;
+  };
   /** From `?c=` on a cold load from the sidebar. */
   initialConversationId?: string | null;
-};
-
-type StreamMeta = {
-  conversationId: string;
-  model: { id: string; name: string; provider: ProviderId; providerLabel: string };
-  cost: number;
 };
 
 function firstName(name: string, email: string) {
@@ -48,8 +54,12 @@ export function ChatApp({
   initialUser,
   initialUsage,
   initialConversations,
-  initialModels,
   anyConfigured,
+  brandName,
+  chatEnabled,
+  greetings,
+  footerNote,
+  features,
   initialConversationId = null,
 }: Props) {
   const router = useRouter();
@@ -57,7 +67,6 @@ export function ChatApp({
 
   const [user, setUser] = useState(initialUser);
   const [usage, setUsage] = useState(initialUsage);
-  const [models, setModels] = useState(initialModels);
   const [providerReady, setProviderReady] = useState(anyConfigured);
   const [conversations, setConversations] = useState(initialConversations);
 
@@ -67,11 +76,9 @@ export function ChatApp({
   const [attachments, setAttachments] = useState<AttachmentView[]>([]);
   const [sending, setSending] = useState(false);
   const [deepResearch, setDeepResearch] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string | null>(initialUser.model);
 
   const [usageOpen, setUsageOpen] = useState(false);
   const [effortOpen, setEffortOpen] = useState(false);
-  const [modelOpen, setModelOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notice, setNotice] = useState<{ text: string; action?: { label: string; href: string } } | null>(null);
@@ -117,6 +124,7 @@ export function ChatApp({
   }, []);
 
   const loadWorkspace = useCallback(async (id: string) => {
+    if (!features.graceCode) return;
     try {
       const response = await fetch(`/api/workspace/${id}`, { cache: "no-store" });
       if (!response.ok) return;
@@ -127,7 +135,7 @@ export function ChatApp({
     } catch {
       /* the chat still works without its workspace */
     }
-  }, []);
+  }, [features.graceCode]);
 
   // Model catalog: refresh once on mount so an admin key change appears.
   useEffect(() => {
@@ -136,9 +144,8 @@ export function ChatApp({
       try {
         const response = await fetch("/api/models", { cache: "no-store" });
         if (!response.ok || !alive) return;
-        const data = (await response.json()) as { models: CatalogModel[]; anyConfigured: boolean };
-        setModels(data.models);
-        setProviderReady(data.anyConfigured);
+        const data = (await response.json()) as { anyConfigured?: boolean };
+        setProviderReady(Boolean(data.anyConfigured));
       } catch {
         /* the server render already told us */
       }
@@ -201,10 +208,10 @@ export function ChatApp({
         setNotice(
           user.isAdmin
             ? {
-                text: "No provider is connected yet, so there is nothing to send to.",
+                text: "No AI service is connected yet, so there is nothing to send to.",
                 action: { label: "Open the console", href: "/admin" },
               }
-            : { text: "Grace is not connected yet. The owner needs to enable a provider." }
+            : { text: "Grace is not connected yet. The owner needs to finish setup." }
         );
         return;
       }
@@ -256,7 +263,7 @@ export function ChatApp({
 
       const controller = new AbortController();
       abortRef.current = controller;
-      let meta: StreamMeta | null = null;
+      let streamConversationId: string | null = null;
       let accumulated = "";
       let streamError = false;
 
@@ -275,7 +282,6 @@ export function ChatApp({
               dataUrl: a.mime.startsWith("image/") ? a.dataUrl : undefined,
             })),
             effort: user.effort,
-            model: selectedModel,
             deepResearch,
             workspace: codeMode,
             focus: openFilePath,
@@ -333,21 +339,10 @@ export function ChatApp({
             }
 
             if (event.type === "meta") {
-              meta = event as unknown as StreamMeta;
-              setConversationId(meta.conversationId);
+              streamConversationId = String(event.conversationId ?? "");
+              if (streamConversationId) setConversationId(streamConversationId);
               refreshConversations();
               window.dispatchEvent(new CustomEvent("grace:refresh"));
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === `${optimisticId}-reply`
-                    ? {
-                        ...m,
-                        modelName: meta!.model.name,
-                        providerLabel: meta!.model.providerLabel,
-                      }
-                    : m
-                )
-              );
             }
             if (event.type === "status") {
               setMessages((prev) =>
@@ -399,7 +394,7 @@ export function ChatApp({
                     : m
                 )
               );
-              if (meta) void loadWorkspace((meta as StreamMeta).conversationId);
+              if (streamConversationId) void loadWorkspace(streamConversationId);
             }
             if (event.type === "saved") refreshUsage();
             if (event.type === "done") {
@@ -442,7 +437,6 @@ export function ChatApp({
       user.effort,
       refreshConversations,
       refreshUsage,
-      selectedModel,
       sending,
       codeMode,
       openFilePath,
@@ -477,7 +471,7 @@ export function ChatApp({
 
   // -------------------------------------------------------------- uploads
   const uploadFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+    if (!features.attachments || !files || files.length === 0) return;
     const remaining = Math.max(0, 6 - attachments.length);
     if (files.length > remaining) {
       setNotice({ text: `Six files per message. ${files.length - remaining} were not added.` });
@@ -534,7 +528,6 @@ export function ChatApp({
             id: string;
             role: "user" | "assistant" | "system";
             content: string;
-            modelName: string | null;
             attachments: { name: string; mime: string }[];
             error: boolean;
           }[];
@@ -547,7 +540,6 @@ export function ChatApp({
               id: m.id,
               role: m.role,
               content: m.content,
-              modelName: m.modelName,
               attachments: m.attachments as { name: string; mime: string }[],
               error: m.error,
             }))
@@ -574,6 +566,24 @@ export function ChatApp({
     const timer = window.setTimeout(() => void openConversation(id), 0);
     return () => window.clearTimeout(timer);
   }, [initialConversationId, search, openConversation]);
+
+  // A question typed into the public page's composer arrives as ?prompt=. It is
+  // sent as the first message of a fresh chat and the parameter is then removed
+  // from the URL, so a refresh does not ask it a second time.
+  const sentInitialPrompt = useRef(false);
+  useEffect(() => {
+    if (sentInitialPrompt.current) return;
+    const carried = search.get("prompt");
+    if (!carried || carried.trim().length === 0) return;
+    if (initialConversationId || search.get("c")) return;
+    sentInitialPrompt.current = true;
+    const timer = window.setTimeout(() => {
+      router.replace("/", { scroll: false });
+      if (chatEnabled) void send(carried);
+      else setInput(carried);
+    }, 60);
+    return () => window.clearTimeout(timer);
+  }, [search, send, router, initialConversationId, chatEnabled]);
 
   // The shell dispatches these because it owns the sidebar.
   useEffect(() => {
@@ -609,11 +619,6 @@ export function ChatApp({
     void persistSettings({ showCreditPercentage: next });
   };
 
-  const pickModel = (id: string) => {
-    setSelectedModel(id);
-    void persistSettings({ model: id });
-  };
-
   /** Both buy buttons post to the real checkout route and surface its reason. */
   const buy = async (kind: "credits" | "apex") => {
     const response = await fetch("/api/billing", {
@@ -633,7 +638,6 @@ export function ChatApp({
   };
 
   const empty = messages.length === 0;
-  const modelLabel = "Grace 3";
 
   return (
     <div className="flex h-[100dvh] min-h-0 w-full flex-col">
@@ -641,7 +645,7 @@ export function ChatApp({
         remainingPct={usage.remainingPct}
         onUsage={() => setUsageOpen(true)}
         onNewChat={newChat}
-        modelLabel={modelLabel}
+        brandName={brandName}
         onToggleSidebar={() => setDrawerOpen(true)}
         sidebarCollapsed={false}
       />
@@ -660,7 +664,7 @@ export function ChatApp({
                 on short windows so they can never crowd the composer. */}
             <div className="mx-auto w-full max-w-[var(--thread-w)]">
               <div className="flex flex-col items-center px-1 pt-[14px] sm:px-5 sm:pt-9">
-                <Greeting name={greetingName} />
+                <Greeting name={greetingName} lines={greetings} />
 
                 <div className="animate-fade-up mt-6 grid w-full max-w-[620px] grid-cols-1 gap-2 xs:grid-cols-2 [@media(max-height:600px)]:hidden">
                   {(codeMode
@@ -696,14 +700,14 @@ export function ChatApp({
                   <p className="animate-fade-up mt-4 flex max-w-[min(100%,28rem)] flex-wrap items-center justify-center gap-x-1.5 gap-y-1 rounded-[14px] border border-hairline bg-control px-3.5 py-2 text-center text-[12.5px] leading-5 text-sub">
                     {user.isAdmin ? (
                       <>
-                        Add a provider key in{" "}
+                        Add an AI service key in{" "}
                         <Link href="/admin" className="font-semibold text-accent-text hover:underline">
                           the admin console
                         </Link>{" "}
                         to start chatting
                       </>
                     ) : (
-                      "Grace is not connected yet. The owner needs to enable a provider."
+                      "Grace is not connected yet. The owner needs to finish setup."
                     )}
                   </p>
                 )}
@@ -763,15 +767,11 @@ export function ChatApp({
           open={effortOpen}
           onClose={() => setEffortOpen(false)}
           value={user.effort}
-          modelName={selectedModel ? (models.find((m) => m.id === selectedModel)?.name ?? null) : null}
           onChange={(index) => setUser((prev) => ({ ...prev, effort: index }))}
           onCommit={setEffort}
-          onOpenModels={() => {
-            setEffortOpen(false);
-            setModelOpen(true);
-          }}
         />
 
+        {chatEnabled ? (
         <Composer
           inputRef={composerInputRef}
           value={input}
@@ -779,11 +779,12 @@ export function ChatApp({
           onSend={() => void send()}
           onStop={stop}
           sending={sending}
+          attachmentsEnabled={features.attachments}
+          deepResearchEnabled={features.deepResearch}
           onAttachFiles={() => fileInputRef.current?.click()}
           onTakePhoto={() => photoInputRef.current?.click()}
           onOpenEffort={() => setEffortOpen((v) => !v)}
           effortLabel={effortLabel}
-          modelLabel={modelLabel}
           mode={codeMode ? "code" : "chat"}
           deepResearchOn={deepResearch}
           onToggleDeepResearch={() => setDeepResearch((v) => !v)}
@@ -792,9 +793,22 @@ export function ChatApp({
           menuOpen={menuOpen}
           onMenuOpenChange={setMenuOpen}
         />
+        ) : (
+          /* The owner can pause chat. A dead composer would look broken, so the
+             field is replaced by a plain statement of what is happening. */
+          <div
+            role="status"
+            className="flex flex-col gap-1 rounded-[22px] border border-hairline bg-control px-4 py-3.5 sm:rounded-[24px]"
+          >
+            <p className="text-[13.5px] font-semibold text-ink">Chat is paused</p>
+            <p className="text-[12.5px] leading-5 text-muted">
+              The owner has switched messaging off for now. Your conversations are safe and nothing was lost.
+            </p>
+          </div>
+        )}
 
         <div className="mt-1.5 flex items-center justify-center gap-2 px-1">
-          {codeMode &&
+          {features.graceCode && codeMode &&
           !workspaceRepo &&
           workspaceFiles.length === 0 ? (
             <button
@@ -805,9 +819,9 @@ export function ChatApp({
               Code mode is on · attach a repository
             </button>
           ) : (
-            <p className="text-[12px] leading-4 text-muted">Grace can make mistakes.</p>
+            <p className="text-[12px] leading-4 text-muted">{footerNote}</p>
           )}
-          {(codeMode || workspaceRepo || workspaceFiles.length > 0) && (
+          {features.graceCode && (codeMode || workspaceRepo || workspaceFiles.length > 0) && (
             <button
               type="button"
               onClick={() => setWorkspaceOpen(true)}
@@ -820,7 +834,7 @@ export function ChatApp({
         </div>
       </div>
 
-      <input
+      {features.attachments && <input
         ref={fileInputRef}
         type="file"
         multiple
@@ -832,8 +846,8 @@ export function ChatApp({
           void uploadFiles(event.target.files);
           event.target.value = "";
         }}
-      />
-      <input
+      />}
+      {features.attachments && <input
         ref={photoInputRef}
         type="file"
         accept="image/*"
@@ -845,9 +859,9 @@ export function ChatApp({
           void uploadFiles(event.target.files);
           event.target.value = "";
         }}
-      />
+      />}
 
-      <WorkspacePanel
+      {features.graceCode && <WorkspacePanel
         open={workspaceOpen}
         onClose={() => setWorkspaceOpen(false)}
         conversationId={conversationId}
@@ -863,7 +877,7 @@ export function ChatApp({
           setConversationId(id);
           refreshConversations();
         }}
-      />
+      />}
 
       <UsageModal
         open={usageOpen}
@@ -873,16 +887,7 @@ export function ChatApp({
         onTogglePercentage={onTogglePercentage}
         onBuyCredits={() => buy("credits")}
         onBuyApex={() => buy("apex")}
-      />
-
-      <ModelSheet
-        open={modelOpen}
-        onClose={() => setModelOpen(false)}
-        models={models}
-        selected={selectedModel}
-        onSelect={pickModel}
-        anyConfigured={providerReady}
-        isAdmin={user.isAdmin}
+        apexEnabled={features.apex}
       />
 
       <MobileSheet
@@ -899,6 +904,8 @@ export function ChatApp({
           newChat();
         }}
         onSignOut={() => void signOut()}
+        features={features}
+        isAdmin={user.isAdmin}
       />
     </div>
   );
@@ -918,6 +925,8 @@ function MobileSheet({
   onSelect,
   onNew,
   onSignOut,
+  features,
+  isAdmin,
 }: {
   open: boolean;
   onClose: () => void;
@@ -926,14 +935,17 @@ function MobileSheet({
   onSelect: (id: string) => void;
   onNew: () => void;
   onSignOut: () => void;
+  features: { projects: boolean; memory: boolean; apex: boolean; graceCode: boolean; attachments: boolean; deepResearch: boolean };
+  isAdmin: boolean;
 }) {
   const links = [
-    { href: "/projects", label: "Projects" },
+    ...(features.projects ? [{ href: "/projects", label: "Projects" }] : []),
     { href: "/usage", label: "Usage & limits" },
-    { href: "/memory", label: "Memory" },
+    ...(features.memory ? [{ href: "/memory", label: "Memory" }] : []),
     { href: "/upcoming", label: "Upcoming" },
     { href: "/connections", label: "Connections" },
-    { href: "/apex", label: "Apex" },
+    ...(features.apex ? [{ href: "/apex", label: "Apex" }] : []),
+    ...(isAdmin ? [{ href: "/admin", label: "Admin console" }] : []),
     { href: "/settings", label: "Settings" },
   ];
   if (!open) return null;

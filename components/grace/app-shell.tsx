@@ -13,6 +13,9 @@ type Props = {
   user: SessionUserView;
   usage: UsageData;
   conversations: ConversationSummary[];
+  /** Which destinations the owner left switched on in the console. */
+  features: { projects: boolean; memory: boolean; apex: boolean; graceCode: boolean };
+  brandName: string;
   children: React.ReactNode;
 };
 
@@ -27,7 +30,7 @@ type Props = {
  * Chat lives at "/" and is docked into `children`; every other route is a
  * document, and the floating button opens a real chat panel on top of it.
  */
-export function AppShell({ user, usage, conversations: initial, children }: Props) {
+export function AppShell({ user, usage, conversations: initial, features, brandName, children }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -189,6 +192,8 @@ export function AppShell({ user, usage, conversations: initial, children }: Prop
         onOpenApex={() => router.push("/apex")}
         onOpenProfile={() => router.push("/settings")}
         onSignOut={() => void signOut()}
+        features={features}
+        brandName={brandName}
       />
 
       <div className="relative flex h-[100dvh] min-w-0 flex-1 flex-col overflow-hidden">
@@ -196,11 +201,11 @@ export function AppShell({ user, usage, conversations: initial, children }: Prop
       </div>
 
       {/* Floating chat: only where chat is not already the page. */}
-      {!isChat && (
+      {!isChat && pathname !== "/admin" && (
         <button
           type="button"
           onClick={() => setChatOpen(true)}
-          aria-label="Open chat with Grace"
+          aria-label={`Open chat with ${brandName}`}
           className="press fixed bottom-5 right-5 z-40 flex h-12 items-center gap-2 rounded-full bg-ink pl-4 pr-5 text-[13.5px] font-semibold text-black shadow-[0_12px_32px_rgba(0,0,0,0.55)] hover:opacity-90"
         >
           <MessageCircle size={17} strokeWidth={2.2} aria-hidden="true" />
@@ -218,11 +223,11 @@ export function AppShell({ user, usage, conversations: initial, children }: Prop
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="Chat with Grace"
+            aria-label={`Chat with ${brandName}`}
             className="float-panel animate-sheet-up absolute bottom-5 right-5 flex h-[min(680px,calc(100dvh-88px))] w-[min(430px,calc(100vw-40px))] flex-col overflow-hidden rounded-[22px]"
           >
             <div className="flex shrink-0 items-center gap-2 border-b border-hairline px-4 py-3">
-              <span className="min-w-0 flex-1 text-[13.5px] font-semibold text-ink">Grace 3</span>
+              <span className="min-w-0 flex-1 text-[13.5px] font-semibold text-ink">{brandName}</span>
               <button
                 type="button"
                 onClick={newChat}
@@ -242,7 +247,7 @@ export function AppShell({ user, usage, conversations: initial, children }: Prop
             </div>
             <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
               <p className="text-[15px] font-medium text-ink">
-                Grace is docked beside this page.
+                {brandName} is docked beside this page.
               </p>
               <p className="max-w-[30ch] text-[12.5px] leading-5 text-sub">
                 The full conversation lives in the main chat. Open it to keep your history and

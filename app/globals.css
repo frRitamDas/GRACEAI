@@ -402,3 +402,136 @@
     transition-duration: 1ms !important;
   }
 }
+
+/* ==========================================================================
+ * The paper theme.
+ *
+ * The chat is black; the public page is paper. Rather than fork a second
+ * stylesheet, the marketing surface is wrapped in `[data-theme="paper"]` and
+ * every token in the ladder is re-pointed at the light values measured from
+ * the reference page. Anything that draws itself with the app's tokens
+ * therefore turns light inside that wrapper and stays dark everywhere else —
+ * including menus, borders and scrollbars, because they all read the same
+ * variables.
+ *
+ * Values are the measured reference tokens, not eyeballed equivalents:
+ *   surface    #FCFAF8 (warm off-white, never pure white)
+ *   raised     #FFFFFF
+ *   sunken     #F0EBE5
+ *   control    #F5F1EC
+ *   text       #2E2B29 / #67625B / #8B867E
+ *   border     #EEEDEC / #E3DED8 / #DAD3CB
+ *   ink cta    #252523
+ *   highlight  #F4C406
+ * ========================================================================== */
+[data-theme="paper"] {
+  --color-bg: #fcfaf8;
+  --color-control: #f5f1ec;
+  --color-surface: #ffffff;
+  --color-surface-raised: #f0ebe5;
+  --color-border: #eeedec;
+  --color-border-strong: #dad3cb;
+
+  --color-text-primary: #2e2b29;
+  --color-text-secondary: #67625b;
+  --color-text-muted: #8b867e;
+
+  /* The accent is a warm ink, not a blue: the reference's only saturated
+     colour is the highlighter yellow behind one word, and blue would read as
+     a different product. */
+  --color-accent: #252523;
+  --color-accent-soft: #f0ebe5;
+  --color-accent-text: #4a453f;
+  --color-disabled: #ddd7d0;
+
+  --color-success: #2f7d5d;
+  --color-warning: #8a6106;
+  --color-danger: #b4372c;
+
+  --font-family: "Instrument Sans", "Inter Variable", system-ui, sans-serif;
+  --font-display: "Instrument Serif", ui-serif, Georgia, Cambria, "Times New Roman", serif;
+
+  color-scheme: light;
+}
+
+[data-theme="paper"] ::selection {
+  background: #f4c406;
+  color: #2e2b29;
+}
+
+[data-theme="paper"] :focus-visible {
+  outline-color: #252523;
+}
+
+/* The measured type scale from the reference stylesheet. `.header-5xl` is the
+   one big line on the page: 48px serif at weight 300, leading 1, and the same
+   tight -0.025em tracking the reference uses. */
+.paper-header {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.025em;
+  color: #67625b;
+}
+
+@media (min-width: 640px) {
+  .paper-header {
+    font-size: 3.5rem;
+  }
+}
+
+/* The highlighter: an inline block of pure yellow behind an italic word, with
+   the text inside the block turning near-black. Padding is horizontal only so
+   the block hugs the line box exactly as the reference does. */
+.paper-highlight {
+  display: inline-block;
+  background: #f4c406;
+  color: #252523;
+  padding-inline: 0.5rem;
+  line-height: 1;
+  font-style: italic;
+}
+
+.paper-rule {
+  border-color: #eeedec;
+}
+
+/* One soft lift, used by cards that can be clicked. The reference's own card
+   shadow is a nearly invisible 5px grey halo, so nothing here is heavy. */
+.paper-lift {
+  transition:
+    background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.paper-lift:hover {
+  background: #f5f1ec;
+  border-color: #dad3cb;
+}
+.paper-lift:active {
+  transform: translateY(0.5px);
+}
+
+/* The page's own entrance: one soft rise, staggered by the caller. */
+@keyframes paper-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.paper-rise {
+  animation: paper-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paper-rise,
+  .paper-lift {
+    animation: none;
+    transition: none;
+  }
+}

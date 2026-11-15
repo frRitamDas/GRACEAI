@@ -14,7 +14,7 @@ export const SESSION_COOKIE = "grace_session";
 
 /** Columns publicUser() reads. Deliberately excludes password_hash. */
 const USER_COLUMNS_SESSION =
-  "id, email, name, is_admin, unlimited, plan, credits, effort, provider, model, show_credit_percentage, created_at";
+  "id, email, name, is_admin, unlimited, plan, credits, effort, show_credit_percentage, created_at";
 const SESSION_TTL_DAYS = 30;
 
 export type SessionUser = {
@@ -27,26 +27,34 @@ export type SessionUser = {
   plan: string;
   credits: number;
   effort: number;
-  provider: string;
-  model: string | null;
   showCreditPercentage: boolean;
   createdAt: string;
 };
 
+/**
+ * One shape out of two storages.
+ *
+ * Supabase and Postgres hand back snake_case rows; the local JSON store keeps
+ * camelCase objects. Both end up here, and reading only one spelling silently
+ * dropped `isAdmin` on the local path — which locked the console for the very
+ * person who owns the deployment. Accept either spelling for every field.
+ */
 export function publicUser(row: Record<string, unknown>): SessionUser {
+  const pick = <T>(snake: string, camel: string, fallback: T): T => {
+    const value = row[snake] ?? row[camel];
+    return (value === undefined || value === null ? fallback : value) as T;
+  };
   return {
     id: String(row.id),
     email: String(row.email ?? ""),
     name: String(row.name ?? ""),
-    isAdmin: Boolean(row.is_admin),
-    unlimited: Boolean(row.unlimited),
-    plan: String(row.plan ?? "free"),
-    credits: Number(row.credits ?? 0),
-    effort: Number(row.effort ?? 0),
-    provider: String(row.provider ?? "openrouter"),
-    model: (row.model as string | null) ?? null,
-    showCreditPercentage: row.show_credit_percentage !== false,
-    createdAt: String(row.created_at ?? nowIso()),
+    isAdmin: Boolean(pick("is_admin", "isAdmin", false)),
+    unlimited: Boolean(pick("unlimited", "unlimited", false)),
+    plan: String(pick("plan", "plan", "free")),
+    credits: Number(pick("credits", "credits", 0)),
+    effort: Number(pick("effort", "effort", 0)),
+    showCreditPercentage: pick<boolean>("show_credit_percentage", "showCreditPercentage", true) !== false,
+    createdAt: String(pick("created_at", "createdAt", nowIso())),
   };
 }
 

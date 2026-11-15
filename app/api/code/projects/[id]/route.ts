@@ -11,6 +11,8 @@ import {
   writeFile,
 } from "@/lib/code/store";
 import { getCurrentUser } from "@/lib/auth/session";
+import { jsonError } from "@/lib/api";
+import { featureEnabled } from "@/lib/settings";
 
 /**
  * One project: its files, its transcript, and direct file edits.
@@ -39,6 +41,7 @@ export async function GET(
 ) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+  if (!(await featureEnabled("projects"))) return jsonError("Projects are turned off on this deployment.", 403, { code: "feature_off" });
 
   const { id } = await context.params;
   const project = await getProject(user.id, id);
@@ -57,6 +60,7 @@ export async function PATCH(
 ) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+  if (!(await featureEnabled("projects"))) return jsonError("Projects are turned off on this deployment.", 403, { code: "feature_off" });
 
   const { id } = await context.params;
   const project = await getProject(user.id, id);

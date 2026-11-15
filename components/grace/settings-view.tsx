@@ -1,21 +1,12 @@
 "use client";
 
-import { ArrowLeft, Check, ChevronRight, Code2, ExternalLink, KeyRound, LogOut } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Code2, KeyRound, LogOut } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { EFFORT_LEVELS } from "@/lib/ai/catalog";
 import { Toggle } from "@/components/grace/toggle";
-
-type ProviderStatusView = {
-  id: string;
-  label: string;
-  blurb: string;
-  envKey: string;
-  docsUrl: string;
-  configured: boolean;
-};
 
 type Props = {
   user: {
@@ -28,9 +19,9 @@ type Props = {
     unlimited: boolean;
     showCreditPercentage: boolean;
   };
-  providers: ProviderStatusView[];
-  models: { id: string; name: string; providerLabel: string; credits: number; tier: number; available: boolean }[];
-  isAdmin: boolean;
+  /** Whether the owner left the coding workspace switched on. */
+  graceCodeEnabled: boolean;
+  projectsEnabled: boolean;
 };
 
 /**
@@ -41,14 +32,13 @@ type Props = {
  * Rows that do something behave like links; rows that only report state have no
  * hover, so nothing looks clickable that is not.
  */
-export function SettingsView({ user, providers, models, isAdmin }: Props) {
+export function SettingsView({ user, graceCodeEnabled, projectsEnabled }: Props) {
   const router = useRouter();
   const [name, setName] = useState(user.name);
   const [effort, setEffort] = useState(user.effort);
   const [showPct, setShowPct] = useState(user.showCreditPercentage);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [catalogOpen, setCatalogOpen] = useState(false);
 
   const save = async (patch: Record<string, unknown>) => {
     setBusy(true);
@@ -163,80 +153,6 @@ export function SettingsView({ user, providers, models, isAdmin }: Props) {
           </Row>
         </Group>
 
-        <Group title="Providers">
-          <p className="border-b border-hairline px-3.5 py-2.5 text-[11.5px] leading-[17px] text-muted">
-            {isAdmin
-              ? "Keys are deployment-wide. Add or replace them in the admin console."
-              : "Keys are managed by the workspace owner. Everything they connect works here."}
-          </p>
-          {providers.map((provider) => (
-            <Row
-              key={provider.id}
-              label={provider.label}
-              detail={isAdmin && !provider.configured ? provider.envKey : provider.blurb}
-            >
-              <span className="flex items-center gap-2">
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${
-                    provider.configured
-                      ? "bg-accent-soft text-accent-text"
-                      : "bg-white/[0.06] text-muted"
-                  }`}
-                >
-                  {provider.configured ? "On" : isAdmin ? "Key needed" : "Off"}
-                </span>
-                {isAdmin && !provider.configured && (
-                  <a
-                    href={provider.docsUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={`Get a ${provider.label} key`}
-                    className="grid h-6 w-6 place-items-center rounded-[5px] text-muted hover:bg-white/[0.06] hover:text-ink"
-                  >
-                    <ExternalLink size={11} />
-                  </a>
-                )}
-              </span>
-            </Row>
-          ))}
-        </Group>
-
-        <Group
-          title="Model catalog"
-          action={
-            <button
-              type="button"
-              onClick={() => setCatalogOpen((v) => !v)}
-              className="press flex items-center gap-1 rounded-[5px] px-1.5 py-0.5 text-[11px] text-muted hover:bg-white/[0.06] hover:text-ink"
-              aria-expanded={catalogOpen}
-            >
-              {catalogOpen ? "Hide" : `Show ${models.length}`}
-              <ChevronRight
-                size={11}
-                className={`transition-transform ${catalogOpen ? "rotate-90" : ""}`}
-                aria-hidden="true"
-              />
-            </button>
-          }
-        >
-          {!catalogOpen ? (
-            <Row
-              label={`${models.filter((m) => m.available).length} of ${models.length} available`}
-              detail={`${new Set(models.map((m) => m.providerLabel)).size} providers`}
-            />
-          ) : (
-            models.map((model) => (
-              <Row key={model.id} label={model.name} detail={`${model.providerLabel} · tier ${model.tier}`}>
-                <span
-                  className={`text-[11px] tabular-nums ${model.available ? "text-sub" : "text-muted"}`}
-                >
-                  {model.credits} cr
-                </span>
-              </Row>
-            ))
-          )}
-        </Group>
-
         {user.isAdmin && (
           <Group title="Deployment owner">
             <Link
@@ -258,21 +174,23 @@ export function SettingsView({ user, providers, models, isAdmin }: Props) {
         )}
 
         <Group title="Workspace">
-          <Link
-            href="/code"
-            className="press flex items-center gap-3 px-3.5 py-2.5 hover:bg-white/[0.035]"
-          >
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[6px] bg-accent-soft text-accent-text">
-              <Code2 size={13} aria-hidden="true" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[12.5px] text-ink">Grace Code</span>
-              <span className="block text-[11.5px] text-muted">
-                A coding workspace that reads files and writes changes back.
+          {graceCodeEnabled && projectsEnabled && (
+            <Link
+              href="/code"
+              className="press flex items-center gap-3 px-3.5 py-2.5 hover:bg-white/[0.035]"
+            >
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[6px] bg-accent-soft text-accent-text">
+                <Code2 size={13} aria-hidden="true" />
               </span>
-            </span>
-            <ChevronRight size={13} className="shrink-0 text-muted" aria-hidden="true" />
-          </Link>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[12.5px] text-ink">Grace Code</span>
+                <span className="block text-[11.5px] text-muted">
+                  A coding workspace that reads files and writes changes back.
+                </span>
+              </span>
+              <ChevronRight size={13} className="shrink-0 text-muted" aria-hidden="true" />
+            </Link>
+          )}
           <button
             type="button"
             onClick={async () => {
@@ -280,7 +198,9 @@ export function SettingsView({ user, providers, models, isAdmin }: Props) {
               router.replace("/");
               router.refresh();
             }}
-            className="press flex w-full items-center gap-3 border-t border-hairline px-3.5 py-2.5 text-left hover:bg-white/[0.035]"
+            className={`press flex w-full items-center gap-3 px-3.5 py-2.5 text-left hover:bg-white/[0.035] ${
+              graceCodeEnabled ? "border-t border-hairline" : ""
+            }`}
           >
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[6px] bg-danger/10 text-danger">
               <LogOut size={13} aria-hidden="true" />

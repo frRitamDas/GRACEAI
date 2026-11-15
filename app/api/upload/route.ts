@@ -4,6 +4,7 @@ import { jsonError } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth/session";
 import { extractPdfText } from "@/lib/files/pdf";
 import { saveFile } from "@/lib/db/store";
+import { getSettings } from "@/lib/settings";
 
 /**
  * Turns an uploaded file into text (and a data URL for images) that the chat
@@ -25,6 +26,9 @@ const TEXT_MIMES = [
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return jsonError("Sign in to attach files.", 401);
+  const settings = await getSettings();
+  if (!settings.chatEnabled) return jsonError("Chat is paused right now.", 503, { code: "chat_paused" });
+  if (!settings.features.attachments) return jsonError("Attachments are turned off on this deployment.", 403, { code: "feature_off" });
 
   const form = await request.formData().catch(() => null);
   if (!form) return jsonError("The upload did not arrive. Try again.");

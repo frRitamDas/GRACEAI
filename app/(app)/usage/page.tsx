@@ -6,7 +6,7 @@ import { loadShell } from "@/lib/shell";
 
 export const instant = false;
 
-export const metadata = { title: "Usage & limits — Grace" };
+export const metadata = { title: "Usage & limits" };
 
 export default async function UsagePage() {
   const user = await getCurrentUser();

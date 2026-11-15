@@ -22,7 +22,7 @@ import { publicUser, type SessionUser } from "@/lib/auth/session";
  */
 
 const USER_COLUMNS =
-  "id, email, name, is_admin, unlimited, plan, credits, effort, provider, model, show_credit_percentage, created_at";
+  "id, email, name, is_admin, unlimited, plan, credits, effort, show_credit_percentage, created_at";
 
 export type ConversationRepo = { owner: string; name: string; branch: string };
 
@@ -84,10 +84,25 @@ function toMessage(row: Record<string, unknown>): Message {
 // ---------------------------------------------------------------------------
 // Users
 // ---------------------------------------------------------------------------
-export async function findUserByEmail(email: string) {
+/**
+ * Users are addressed by email in the console, so this returns the public
+ * shape plus the password hash that only the login route needs. Supabase and
+ * SQL hand back snake_case rows, so everything funnels through `userRow` and
+ * callers never see a storage-specific field.
+ */
+export type UserRow = SessionUser & { password_hash: string | null };
+
+function userRow(row: Record<string, unknown>): UserRow {
+  return { ...publicUser(row), password_hash: (row.password_hash as string | null) ?? null };
+}
+
+export async function findUserByEmail(email: string): Promise<UserRow | null> {
   const normalized = email.trim().toLowerCase();
   if (localMode()) {
-    return readLocalDb((db) => db.users.find((u) => u.email === normalized) ?? null);
+    return readLocalDb((db) => {
+      const user = db.users.find((u) => u.email === normalized);
+      return user ? userRow(user as unknown as Record<string, unknown>) : null;
+    });
   }
   const supabase = getSupabaseAdmin();
   if (supabase) {
@@ -97,14 +112,16 @@ export async function findUserByEmail(email: string) {
       .eq("email", normalized)
       .maybeSingle();
     if (error) throw new StorageError(error);
-    return (data as Record<string, unknown> | null) ?? null;
+    const row = data as Record<string, unknown> | null;
+    return row ? userRow(row) : null;
   }
   const sql = getSql();
   if (!sql) return null;
   const rows = await sql`
     select password_hash, ${sql.unsafe(USER_COLUMNS)}
     from grace_users where email = ${normalized} limit 1`;
-  return (rows[0] as unknown as Record<string, unknown>) ?? null;
+  const row = rows[0] as unknown as Record<string, unknown> | undefined;
+  return row ? userRow(row) : null;
 }
 
 export async function countUsers(): Promise<number> {
@@ -222,8 +239,6 @@ export async function updateUser(
     name: string;
     unlimited: boolean;
     effort: number;
-    provider: string;
-    model: string | null;
     show_credit_percentage: boolean;
     plan: string;
     credits: number;
@@ -256,12 +271,17 @@ export async function updateUser(
   return rows[0] ? publicUser(rows[0] as unknown as Record<string, unknown>) : null;
 }
 
-export async function listUsers(): Promise<(SessionUser & { conversationCount: number; used: number })[]> {
+export async function listUsers(
+  options: { includeConversationCounts?: boolean } = {}
+): Promise<(SessionUser & { conversationCount: number; used: number })[]> {
+  const includeConversationCounts = options.includeConversationCounts !== false;
   if (localMode()) {
     return readLocalDb((db) =>
       db.users.map((u) => ({
         ...publicUser(u as unknown as Record<string, unknown>),
-        conversationCount: db.conversations.filter((c) => c.user_id === u.id).length,
+        conversationCount: includeConversationCounts
+          ? db.conversations.filter((c) => c.user_id === u.id).length
+          : 0,
         used: db.usage
           .filter((x) => x.user_id === u.id && x.period_start === periodStart())
           .reduce((sum, x) => sum + x.credits_used, 0),
@@ -270,19 +290,58 @@ export async function listUsers(): Promise<(SessionUser & { conversationCount: n
   }
   const supabase = getSupabaseAdmin();
   if (supabase) {
-    const { data } = await supabase.from("grace_users").select(USER_COLUMNS).order("created_at", { ascending: false });
-    return (data ?? []).map((row) => ({
-      ...publicUser(row as Record<string, unknown>),
-      conversationCount: 0,
-      used: 0,
-    }));
+    const { data, error } = await supabase
+      .from("grace_users")
+      .select(USER_COLUMNS)
+      .order("created_at", { ascending: false });
+    if (error) throw new StorageError(error);
+
+    // Supabase REST has no GROUP BY here, so page the narrow user_id column
+    // rather than returning a misleading zero beside every account. Range is
+    // explicit because PostgREST caps each response page.
+    const counts = new Map<string, number>();
+    const pageSize = 1_000;
+    for (let offset = 0; includeConversationCounts; offset += pageSize) {
+      const { data: conversations, error: conversationsError } = await supabase
+        .from("grace_conversations")
+        .select("user_id, created_at, id")
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(offset, offset + pageSize - 1);
+      if (conversationsError) throw new StorageError(conversationsError);
+      for (const conversation of conversations ?? []) {
+        const userId = String(conversation.user_id);
+        counts.set(userId, (counts.get(userId) ?? 0) + 1);
+      }
+      if (!conversations || conversations.length < pageSize) break;
+    }
+
+    return (data ?? []).map((row) => {
+      const user = publicUser(row as Record<string, unknown>);
+      return {
+        ...user,
+        conversationCount: counts.get(user.id) ?? 0,
+        used: 0,
+      };
+    });
   }
   const sql = getSql();
   if (!sql) return [];
-  const rows = await sql`select ${sql.unsafe(USER_COLUMNS)} from grace_users order by created_at desc`;
+  const userColumns = USER_COLUMNS.split(", ").map((column) => `u.${column}`).join(", ");
+  const rows = includeConversationCounts
+    ? await sql`
+        select ${sql.unsafe(userColumns)}, coalesce(c.conversation_count, 0)::int as conversation_count
+        from grace_users u
+        left join (
+          select user_id, count(*) as conversation_count
+          from grace_conversations
+          group by user_id
+        ) c on c.user_id = u.id
+        order by u.created_at desc`
+    : await sql`select ${sql.unsafe(USER_COLUMNS)} from grace_users order by created_at desc`;
   return rows.map((row) => ({
     ...publicUser(row as unknown as Record<string, unknown>),
-    conversationCount: 0,
+    conversationCount: Number(row.conversation_count ?? 0),
     used: 0,
   }));
 }

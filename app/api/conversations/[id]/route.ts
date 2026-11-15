@@ -15,7 +15,16 @@ export async function GET(_request: Request, { params }: Params) {
   const conversation = await getConversation(user.id, id);
   if (!conversation) return jsonError("That chat no longer exists.", 404);
 
-  const messages = await listMessages(id);
+  // Message rows retain private routing metadata for owner-side accounting,
+  // but the user's transcript needs only the content and its attachments.
+  const messages = (await listMessages(id)).map(({ id: messageId, role, content, attachments, error, createdAt }) => ({
+    id: messageId,
+    role,
+    content,
+    attachments,
+    error,
+    createdAt,
+  }));
   return NextResponse.json({ conversation, messages });
 }
 

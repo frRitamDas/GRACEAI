@@ -4,6 +4,8 @@ import { z } from "zod";
 import { createProject, deleteProject, getProject, listProjects } from "@/lib/code/store";
 import { shareProjectWith } from "@/lib/db/social";
 import { getCurrentUser } from "@/lib/auth/session";
+import { jsonError } from "@/lib/api";
+import { featureEnabled } from "@/lib/settings";
 
 /**
  * Grace Code projects.
@@ -24,6 +26,7 @@ const shareSchema = z.object({ email: z.string().trim().email().max(200) });
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+  if (!(await featureEnabled("projects"))) return jsonError("Projects are turned off on this deployment.", 403, { code: "feature_off" });
 
   const projects = await listProjects(user.id);
   return NextResponse.json(
@@ -35,6 +38,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+  if (!(await featureEnabled("projects"))) return jsonError("Projects are turned off on this deployment.", 403, { code: "feature_off" });
 
   let body: z.infer<typeof createSchema>;
   try {
@@ -51,6 +55,7 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+  if (!(await featureEnabled("projects"))) return jsonError("Projects are turned off on this deployment.", 403, { code: "feature_off" });
 
   const url = new URL(request.url);
   const id = url.searchParams.get("id");
@@ -77,6 +82,7 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+  if (!(await featureEnabled("projects"))) return jsonError("Projects are turned off on this deployment.", 403, { code: "feature_off" });
 
   const id = new URL(request.url).searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Send a project id." }, { status: 400 });

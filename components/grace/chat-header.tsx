@@ -11,7 +11,8 @@ type Props = {
   onUsage: () => void;
   onNewChat: () => void;
   /** Model label under the mark. The reference shows the agent, not a brand. */
-  modelLabel?: string;
+  /** The product name shown beside the mark. Never a model name. */
+  brandName?: string;
   /** Desktop: the sidebar rail is hidden below `md`. */
   onToggleSidebar: () => void;
   sidebarCollapsed: boolean;
@@ -33,7 +34,7 @@ export function ChatHeader({
   remainingPct,
   onUsage,
   onNewChat,
-  modelLabel = "Grace 3",
+  brandName = "Grace",
   onToggleSidebar,
   sidebarCollapsed,
 }: Props) {
@@ -57,7 +58,7 @@ export function ChatHeader({
           <GraceMark className="h-[21px] w-[21px] text-[#dcdcdf]" />
         </span>
         <span className="pointer-events-auto max-w-[34vw] truncate rounded-full bg-control px-3 py-1 text-[12.5px] font-semibold text-ink">
-          {modelLabel}
+          {brandName}
         </span>
       </div>
 

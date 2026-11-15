@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getCurrentUser } from "@/lib/auth/session";
 import { billingConfigured, createCheckout } from "@/lib/billing";
+import { featureEnabled } from "@/lib/settings";
 
 /**
  * Starts a purchase, or says why it cannot.
@@ -22,6 +23,10 @@ export async function POST(request: Request) {
     body = schema.parse(await request.json());
   } catch {
     return NextResponse.json({ error: "Pick what to buy." }, { status: 400 });
+  }
+
+  if (body.kind === "apex" && !(await featureEnabled("apex"))) {
+    return NextResponse.json({ error: "Apex is turned off on this deployment.", code: "feature_off" }, { status: 403 });
   }
 
   const result = await createCheckout(user.id, body.kind);

@@ -10,6 +10,7 @@ import {
   safeWorkspacePath,
   writeWorkspaceFile,
 } from "@/lib/workspace/store";
+import { featureEnabled } from "@/lib/settings";
 
 /** Editing a chat workspace's files directly, without spending a model turn. */
 
@@ -18,6 +19,9 @@ type Params = { params: Promise<{ id: string }> };
 async function owned(conversationId: string) {
   const user = await getCurrentUser();
   if (!user) return { error: "Sign in first.", status: 401 as const, user: null };
+  if (!(await featureEnabled("graceCode"))) {
+    return { error: "Grace Code is turned off on this deployment.", status: 403 as const, user: null };
+  }
   const conversation = await getConversation(user.id, conversationId);
   if (!conversation) return { error: "That chat no longer exists.", status: 404 as const, user: null };
   return { error: null, status: 200 as const, user };

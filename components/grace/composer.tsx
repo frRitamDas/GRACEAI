@@ -15,10 +15,11 @@ type Props = {
   sending: boolean;
   onAttachFiles: () => void;
   onTakePhoto: () => void;
+  attachmentsEnabled: boolean;
+  deepResearchEnabled: boolean;
   onOpenEffort: () => void;
   /** Current effort level, for the gauge's accessible name. */
   effortLabel: string;
-  modelLabel: string;
   /** Shown on the row under the field: "Grace can make mistakes." or mode copy. */
   mode?: ComposerMode;
   onModeChange?: (next: ComposerMode) => void;
@@ -50,6 +51,8 @@ export function Composer({
   sending,
   onAttachFiles,
   onTakePhoto,
+  attachmentsEnabled,
+  deepResearchEnabled,
   onOpenEffort,
   effortLabel,
   mode = "chat",
@@ -146,6 +149,8 @@ export function Composer({
       <div className="relative">
         <AttachMenu
           open={menuOpen}
+          attachmentsEnabled={attachmentsEnabled}
+          deepResearchEnabled={deepResearchEnabled}
           onClose={() => onMenuOpenChange(false)}
           onAttachFiles={() => {
             onMenuOpenChange(false);
@@ -185,16 +190,18 @@ export function Composer({
           )}
 
           <div className="flex items-end gap-1.5 px-2.5 py-2 sm:gap-2 sm:px-3.5 sm:py-2">
-            <button
-              type="button"
-              onClick={() => onMenuOpenChange(!menuOpen)}
-              aria-label={menuOpen ? "Close menu" : "Add files, photos or research"}
-              aria-expanded={menuOpen}
-              data-attach-toggle=""
-              className="press mb-px grid h-10 w-10 shrink-0 place-items-center rounded-full text-ink transition-colors hover:bg-white/[0.07]"
-            >
-              {menuOpen ? <X size={20} strokeWidth={2} /> : <Plus size={22} strokeWidth={1.9} />}
-            </button>
+            {(attachmentsEnabled || deepResearchEnabled) && (
+              <button
+                type="button"
+                onClick={() => onMenuOpenChange(!menuOpen)}
+                aria-label={menuOpen ? "Close menu" : "Add files, photos or research"}
+                aria-expanded={menuOpen}
+                data-attach-toggle=""
+                className="press mb-px grid h-10 w-10 shrink-0 place-items-center rounded-full text-ink transition-colors hover:bg-white/[0.07]"
+              >
+                {menuOpen ? <X size={20} strokeWidth={2} /> : <Plus size={22} strokeWidth={1.9} />}
+              </button>
+            )}
 
             <label htmlFor="grace-input" className="sr-only">
               {mode === "code" ? "Ask Grace to change the code" : "Ask Grace"}

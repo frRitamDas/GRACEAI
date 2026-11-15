@@ -15,6 +15,29 @@ import { getSettings, saveSettings, type SettingsPatch } from "@/lib/settings";
  */
 
 const greetingTuple = z.tuple([z.string().max(120), z.string().max(120), z.string().max(120)]);
+function safeAnnouncementHref(href: string): boolean {
+  if (!href) return true;
+  if (/^https?:\/\//i.test(href)) {
+    try {
+      const url = new URL(href);
+      return !url.username && !url.password;
+    } catch {
+      return false;
+    }
+  }
+  if (!href.startsWith("/") || href.startsWith("//")) return false;
+  try {
+    return new URL(href, "https://grace.invalid").origin === "https://grace.invalid";
+  } catch {
+    return false;
+  }
+}
+
+const announcementHref = z
+  .string()
+  .trim()
+  .max(300)
+  .refine(safeAnnouncementHref, "Use a local path or an http(s) URL.");
 
 const schema = z
   .object({
@@ -27,10 +50,11 @@ const schema = z
       .object({
         id: z.string().max(40),
         text: z.string().trim().min(1).max(200),
-        href: z.string().trim().max(300),
+        href: announcementHref,
       })
       .nullable()
       .optional(),
+    chatModel: z.string().trim().max(160).optional(),
     allowedModels: z.array(z.string().max(160)).max(60).optional(),
     hiddenModels: z.array(z.string().max(160)).max(200).optional(),
     footerNote: z.string().trim().max(120).optional(),
@@ -65,5 +89,6 @@ export async function PATCH(request: Request) {
 
   const patch = body as SettingsPatch;
   const saved = await saveSettings(patch);
+
   return NextResponse.json({ settings: saved });
 }

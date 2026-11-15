@@ -9,7 +9,6 @@ import {
   getModel,
   pickModelForEffort,
   PROVIDERS,
-  type ProviderId,
 } from "@/lib/ai/catalog";
 import { configuredProviders, getProviderKey, keyServesModel } from "@/lib/ai/env";
 import { cachedCatalog, storeCatalog } from "@/lib/ai/catalog-cache";
@@ -30,6 +29,8 @@ import {
   renameConversation,
 } from "@/lib/db/store";
 import { listMemories } from "@/lib/db/social";
+import { allowedCatalog, getSettings } from "@/lib/settings";
+import { gracePersona } from "@/lib/ai/persona";
 
 export const maxDuration = 300;
 
@@ -46,7 +47,6 @@ const schema = z.object({
   message: z.string().trim().max(20_000).default(""),
   attachments: z.array(attachmentSchema).max(6).default([]),
   effort: z.number().int().min(0).max(EFFORT_LEVELS.length - 1).optional(),
-  model: z.string().max(120).nullable().optional(),
   deepResearch: z.boolean().optional(),
   /**
    * True when the user has the workspace toggle on. The server still decides
@@ -55,9 +55,9 @@ const schema = z.object({
   workspace: z.boolean().optional(),
   /** File the user has open, so the agent reads it first. */
   focus: z.string().max(240).nullable().optional(),
-});
+}).strict();
 
-/** Credits for a turn: base model cost, scaled by effort, plus add-ons. */
+/** Credits for a turn: model cost scaled by effort, plus 25 for the two-pass research workflow. */
 function costFor(modelCredits: number, effort: number, deepResearch: boolean) {
   const effortMultiplier = [1, 1, 1.5, 2, 3][effort] ?? 1;
   return Math.max(1, Math.round(modelCredits * effortMultiplier) + (deepResearch ? 25 : 0));
@@ -78,14 +78,32 @@ export async function POST(request: Request) {
     return jsonError("Write a message first.");
   }
 
+  const settings = await getSettings();
+  if (!settings.chatEnabled) {
+    return jsonError("Chat is paused right now. The owner will turn it back on shortly.", 503, {
+      code: "chat_paused",
+    });
+  }
+
+  if (body.attachments.length > 0 && !settings.features.attachments) {
+    return jsonError("Attachments are turned off on this deployment.", 400, { code: "feature_off" });
+  }
+  if (body.workspace && !settings.features.graceCode) {
+    return jsonError("Grace Code is turned off on this deployment.", 400, { code: "feature_off" });
+  }
+  if (body.deepResearch && !settings.features.deepResearch) {
+    return jsonError("Deep Research is turned off on this deployment.", 403, { code: "feature_off" });
+  }
+  const deepResearch = Boolean(body.deepResearch);
+
   const effort = body.effort ?? user.effort ?? 0;
   const ready = await configuredProviders();
 
   if (ready.size === 0) {
     return jsonError(
       user.isAdmin
-        ? "No provider is connected yet. Add an OpenRouter, Groq or Google AI Studio key in the admin console."
-        : "No provider is available yet. The owner needs to connect one before chats can run.",
+        ? "No AI service is connected yet. Add a provider key in the admin console."
+        : "Grace is not connected yet. The owner needs to finish setup before chats can run.",
       503,
       { code: "no_provider" }
     );
@@ -99,34 +117,29 @@ export async function POST(request: Request) {
   if (!cached) storeCatalog(built);
   const catalog = built.models;
 
-  let model =
-    getModel(body.model, catalog) ??
-    // An unknown id on a provider we can reach is still valid: the model may be
-    // newer than our catalog. Trust the provider prefix and let it answer.
-    (body.model && ready.has(body.model.split("/")[0] as ProviderId)
-      ? {
-          id: body.model,
-          name: body.model.split("/").slice(1).join("/"),
-          provider: body.model.split("/")[0] as ProviderId,
-          upstream: body.model.split("/").slice(1).join("/"),
-          tier: 3,
-          credits: 1,
-          contextLabel: "",
-          blurb: "",
-        }
-      : null) ??
-    pickModelForEffort(effort, (user.provider as ProviderId) ?? "openrouter", ready, catalog);
-
-  if (!ready.has(model.provider)) {
-    model = pickModelForEffort(effort, "openrouter", ready, catalog);
+  // The owner decides which model answers; users never pick one. Grace Code
+  // has its own endpoint and never routes through this request field.
+  const eligible = allowedCatalog(settings, catalog, ready);
+  if (eligible.length === 0) {
+    return jsonError("No models are available right now. Ask the owner to enable one in the console.", 503, {
+      code: "no_model",
+    });
   }
+  const eligibleIds = new Set(eligible.map((m) => m.id));
+  const pinned = settings.chatModel ? getModel(settings.chatModel, catalog) : undefined;
+
+  const model =
+    (pinned && ready.has(pinned.provider) && eligibleIds.has(pinned.id) ? pinned : undefined) ??
+    // Everything below picks from the eligible set only, so the allowlist and
+    // hidden list hold even mid-flight. The user has no provider preference.
+    pickModelForEffort(effort, "openrouter", ready, eligible);
 
   const key = await getProviderKey(model.provider);
   if (!key) {
     return jsonError(
       user.isAdmin
         ? `${PROVIDERS[model.provider].label} is not connected. Add its key in the admin console.`
-        : `${PROVIDERS[model.provider].label} is not available right now. Pick another model.`,
+        : "Grace is not connected yet. Ask the owner to review the setup.",
       503,
       { code: "no_provider" }
     );
@@ -135,7 +148,9 @@ export async function POST(request: Request) {
   // The key may be restricted to a subset of the provider's models.
   if (!(await keyServesModel(model.provider, model.id))) {
     return jsonError(
-      `${model.name} is not enabled for the shared ${PROVIDERS[model.provider].label} key, so it cannot run. Pick another model.`,
+      user.isAdmin
+        ? `${model.name} is not enabled for the shared ${PROVIDERS[model.provider].label} key.`
+        : "Grace is not ready to answer right now. Ask the owner to review the setup.",
       403,
       { code: "model_not_allowed" }
     );
@@ -143,7 +158,7 @@ export async function POST(request: Request) {
 
   // Owners (unlimited) see the cost of each answer but are never blocked or charged.
   const billed = !user.unlimited;
-  const cost = billed ? costFor(model.credits, effort, Boolean(body.deepResearch)) : 0;
+  const cost = billed ? costFor(model.credits, effort, deepResearch) : 0;
   const available = user.credits;
   if (billed && available < cost) {
     return jsonError("You're out of credits this month.", 402, {
@@ -189,9 +204,13 @@ export async function POST(request: Request) {
   // so a question about the code can be answered — turning the toggle off
   // should not make Grace forget what the project is.
   const workspaceOn = Boolean(body.workspace);
-  const workspaceFiles = await listWorkspaceFiles(conversationId);
+  const workspaceFiles = settings.features.graceCode ? await listWorkspaceFiles(conversationId) : [];
   const hasWorkspace = workspaceFiles.length > 0 || Boolean(body.workspace);
-  let systemPrompt: string | undefined;
+  // Grace is one assistant with one author. Which model is behind a turn is an
+  // implementation detail the owner controls, so the reply never names a lab,
+  // a model or a provider, whatever the user calls it.
+  const persona = gracePersona(settings.brandName);
+  let systemPrompt: string | undefined = persona;
   if (hasWorkspace) {
     systemPrompt = codingSystemPrompt({
       projectName: conversationTitle || "this workspace",
@@ -204,12 +223,13 @@ export async function POST(request: Request) {
       // here than Grace Code gives it.
       maxChars: 90_000,
     });
+    systemPrompt = `${persona}\n\n${systemPrompt}`;
   }
 
   // Saved memories ride in the system prompt. They are facts the user wrote, so
   // they are appended last and labelled as such rather than blended with the
   // workspace instructions.
-  const memories = await listMemories(user.id);
+  const memories = settings.features.memory ? await listMemories(user.id) : [];
   if (memories.length > 0) {
     const block = memories
       .slice(0, 40)
@@ -247,14 +267,6 @@ export async function POST(request: Request) {
       send({
         type: "meta",
         conversationId,
-        model: {
-          id: model.id,
-          name: model.name,
-          provider: model.provider,
-          providerLabel: PROVIDERS[model.provider].label,
-        },
-        effort,
-        cost,
       });
 
       try {
@@ -265,6 +277,7 @@ export async function POST(request: Request) {
           turns,
           attachments,
           systemPrompt,
+          deepResearch,
           signal: request.signal,
         })) {
           if (event.type === "status") send({ type: "status", label: event.label });

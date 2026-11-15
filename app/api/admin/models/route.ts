@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { PROVIDERS, type ModelDef, type ProviderId } from "@/lib/ai/catalog";
+import { MODELS, PROVIDERS, type ModelDef, type ProviderId } from "@/lib/ai/catalog";
 import { loadCatalog } from "@/lib/ai/discovery";
 import {
   deleteOverride,
@@ -54,10 +54,39 @@ export async function GET() {
     override: overrides.get(m.id) ?? null,
   }));
 
-  // Overrides can name models discovery did not return (a retired model the
-  // owner still wants listed). Surface them so the console can manage them.
+  // `loadCatalog` removes switched-off models before it returns. The owner
+  // still needs their rows to flip them back on, so rebuild any hidden row that
+  // discovery no longer includes from its saved override metadata.
   const present = new Set(models.map((m) => m.id));
-  const orphans = [...overrides.values()].filter((o) => !present.has(o.id));
+  const hiddenRows = [...overrides.values()]
+    .filter((override) => override.hidden && !present.has(override.id))
+    .map((override) => {
+      const fallback = MODELS.find((model) => model.id === override.id);
+      const inferredProvider = (Object.keys(PROVIDERS) as ProviderId[]).find(
+        (provider) => override.id.startsWith(`${provider}/`)
+      );
+      const provider = override.provider ?? inferredProvider ?? fallback?.provider ?? "openrouter";
+      const upstream = override.upstream ?? fallback?.upstream ?? override.id.slice(override.id.indexOf("/") + 1);
+      return {
+        id: override.id,
+        name: override.name ?? fallback?.name ?? upstream,
+        provider,
+        providerLabel: PROVIDERS[provider].label,
+        tier: override.tier ?? fallback?.tier ?? 3,
+        credits: override.credits ?? fallback?.credits ?? (override.free ? 0 : 2),
+        contextLabel: override.contextLabel ?? fallback?.contextLabel ?? "Context varies",
+        blurb: override.blurb ?? fallback?.blurb ?? "This model is switched off.",
+        free: override.free || Boolean(fallback?.free),
+        upstream,
+        override,
+      };
+    });
+  models.push(...hiddenRows);
+
+  // Non-hidden custom or retired models are returned separately for clients
+  // that want to display them as diagnostics.
+  const allPresent = new Set(models.map((m) => m.id));
+  const orphans = [...overrides.values()].filter((override) => !allPresent.has(override.id));
 
   return NextResponse.json(
     {

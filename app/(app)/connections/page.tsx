@@ -9,7 +9,7 @@ import { loadCatalog } from "@/lib/ai/discovery";
 
 export const instant = false;
 
-export const metadata = { title: "Connections — Grace" };
+export const metadata = { title: "Connections" };
 
 export default async function ConnectionsPage() {
   const user = await getCurrentUser();

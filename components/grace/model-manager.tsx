@@ -3,29 +3,31 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Check,
-  Eye,
-  EyeOff,
   Loader2,
   Pencil,
   Plus,
   RotateCcw,
   Search,
+  Star,
   X,
 } from "lucide-react";
 
-import type { ProviderId } from "@/lib/ai/catalog";
+import { PROVIDERS, type ProviderId } from "@/lib/ai/catalog";
 
 /**
  * The owner's model manager.
  *
- * The public picker shows what people can use; this shows everything, including
- * what is hidden and what was edited, because the owner needs to see the
- * consequences of their own decisions. Every row can be edited in place — name,
- * tier, price, blurb, visibility — and the edits survive a provider refresh
- * because they are stored as overrides.
+ * This is the console's centre of gravity: one row per model with an on/off
+ * switch, because the owner — not the user — decides what answers. A model that
+ * is off is off everywhere: the router skips it, Grace Code skips it, and no
+ * user surface can name it, since users are never shown a model list at all.
  *
- * The list is grouped by provider and filtered client-side; 600 rows of text
- * render fine, and filtering locally keeps typing instant.
+ * Everything else on a row (name, tier, price, blurb) is editable in place and
+ * survives a provider refresh, because the edits are stored as overrides rather
+ * than mutations of the discovered catalog.
+ *
+ * `serving` marks the single model pinned to answer chat; picking one clears
+ * every other pick.
  */
 
 type Override = {
@@ -70,18 +72,57 @@ export function ModelManager({ onMessage }: { onMessage: (text: string, ok: bool
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  /** The model pinned to answer chat. Empty means effort routing decides. */
+  const [serving, setServing] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch("/api/admin/models", { cache: "no-store" });
-      if (!response.ok) return;
-      const data = (await response.json()) as { models?: Row[]; liveProviders?: ProviderId[] };
+      const [settingsResponse, modelsResponse] = await Promise.all([
+        fetch("/api/admin/settings", { cache: "no-store" }),
+        fetch("/api/admin/models", { cache: "no-store" }),
+      ]);
+      if (settingsResponse.ok) {
+        const settings = (await settingsResponse.json()) as { settings?: { chatModel?: string } };
+        setServing(settings.settings?.chatModel || null);
+      }
+      if (!modelsResponse.ok) return;
+      const data = (await modelsResponse.json()) as { models?: Row[]; liveProviders?: ProviderId[] };
       setRows(data.models ?? []);
       setLive(data.liveProviders ?? []);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  /** Pins this model for chat (or unpins it when it is already serving). */
+  const pinModel = useCallback(
+    async (id: string) => {
+      setBusy(id);
+      const next = serving === id ? "" : id;
+      try {
+        const response = await fetch("/api/admin/settings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chatModel: next }),
+        });
+        const data = (await response.json().catch(() => ({}))) as { error?: string };
+        if (!response.ok) {
+          onMessage(data.error ?? "That did not save.", false);
+          return;
+        }
+        setServing(next || null);
+        onMessage(
+          next
+            ? `${rows.find((r) => r.id === id)?.name ?? "That model"} now answers every chat.`
+            : "Routing goes back to the effort level.",
+          true
+        );
+      } finally {
+        setBusy(null);
+      }
+    },
+    [serving, rows, onMessage]
+  );
 
   useEffect(() => {
     void (async () => {
@@ -175,7 +216,7 @@ export function ModelManager({ onMessage }: { onMessage: (text: string, ok: bool
   }, [rows, filter, query]);
 
   const grouped = useMemo(() => {
-    const order: ProviderId[] = ["openrouter", "groq", "google"];
+    const order: ProviderId[] = ["openrouter", "groq", "nvidia", "google"];
     return order
       .map((provider) => ({
         provider,
@@ -234,10 +275,10 @@ export function ModelManager({ onMessage }: { onMessage: (text: string, ok: bool
             <h2 id="models-heading" className="text-[19px] font-semibold tracking-[-0.02em] text-ink">
               Models
             </h2>
-            <p className="mt-1 text-[13.5px] leading-5 text-sub">
+            <p className="mt-1 max-w-[54ch] text-[13.5px] leading-5 text-sub">
               {loading
                 ? "Reading the catalog…"
-                : `${counts.all} models from ${live.length > 0 ? `${live.map((p) => (p === "google" ? "Google" : p === "groq" ? "Groq" : "OpenRouter")).join(", ")} (live)` : "the bundled catalog"}. Edit anything; changes survive a refresh.`}
+                : `${counts.all} models from ${live.length > 0 ? `${live.map((provider) => PROVIDERS[provider].label).join(", ")} (live)` : "the bundled catalog"}. A switch removes a model from Grace entirely; the star makes one answer every chat.`}
             </p>
           </div>
           <button
@@ -431,8 +472,11 @@ export function ModelManager({ onMessage }: { onMessage: (text: string, ok: bool
                               </span>
                             )}
                             {isHidden && (
-                              <span className="shrink-0 text-[10.5px] font-medium text-muted">
-                                hidden
+                              <span className="shrink-0 text-[10.5px] font-medium text-muted">off</span>
+                            )}
+                            {serving === row.id && (
+                              <span className="shrink-0 text-[10.5px] font-medium text-[#E0B341]">
+                                serving
                               </span>
                             )}
                           </p>
@@ -444,12 +488,40 @@ export function ModelManager({ onMessage }: { onMessage: (text: string, ok: bool
 
                         <button
                           type="button"
+                          onClick={() => void pinModel(row.id)}
+                          disabled={busy === row.id || isHidden}
+                          aria-pressed={serving === row.id}
+                          aria-label={
+                            serving === row.id
+                              ? `${row.name} is serving chat. Stop pinning it.`
+                              : `Use ${row.name} for chat`
+                          }
+                          title={serving === row.id ? "Serving every chat" : "Use for chat"}
+                          className={`grid h-8 w-8 shrink-0 place-items-center rounded-full transition-colors disabled:opacity-40 ${
+                            serving === row.id
+                              ? "bg-[#F4C406] text-[#252523]"
+                              : "text-muted hover:bg-control hover:text-ink"
+                          }`}
+                        >
+                          <Star size={13} fill={serving === row.id ? "currentColor" : "none"} />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => void patch(row.id, { hidden: !isHidden })}
                           disabled={busy === row.id}
-                          aria-label={isHidden ? `Show ${row.name}` : `Hide ${row.name}`}
-                          className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-control hover:text-ink disabled:opacity-40"
+                          role="switch"
+                          aria-checked={!isHidden}
+                          aria-label={`${row.name} available to Grace`}
+                          title={isHidden ? "Off — Grace cannot use this" : "On — Grace can use this"}
+                          className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors disabled:opacity-40 ${
+                            isHidden ? "bg-[#3a3a3f]" : "bg-accent"
+                          }`}
                         >
-                          {isHidden ? <EyeOff size={14} /> : <Eye size={14} />}
+                          <span
+                            className={`absolute top-1/2 h-[16px] w-[16px] -translate-y-1/2 rounded-full transition-all duration-200 ${
+                              isHidden ? "left-[3px] bg-[#e9e9ec]" : "left-[19px] bg-white"
+                            }`}
+                          />
                         </button>
                         <button
                           type="button"
