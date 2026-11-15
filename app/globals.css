@@ -1,0 +1,537 @@
+@import "tailwindcss";
+
+/*
+ * One extra breakpoint below `sm`. The desktop shell is the primary layout;
+ * `xs:` keeps a 360px phone from dropping the composer's send button.
+ */
+@theme {
+  --breakpoint-xs: 26rem;
+}
+
+/*
+ * Grace design tokens.
+ *
+ * Values are sampled from the reference screenshots (docs/refs) rather than
+ * invented: the canvas is pure black, every raised surface is one measured
+ * step off it, and blue appears only where something is active or actionable.
+ *
+ * The ladder, lightest last:
+ *   canvas #000000 -> control #1A1A1C -> surface #1D1D1F -> raised #262629
+ * Composers and menus read a hair bluer than cards on purpose; that is what
+ * the reference does, and it keeps a floating layer legible over a card.
+ */
+:root {
+  --color-bg: #000000;
+  --color-control: #1a1a1c;
+  --color-surface: #1d1d1f;
+  --color-surface-raised: #262629;
+  --color-border: #2e2e32;
+  --color-border-strong: #3a3a3f;
+
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #9a9a9f;
+  --color-text-muted: #5c5c62;
+
+  --color-accent: #3b82f6;
+  --color-accent-soft: #1e2a44;
+  --color-accent-text: #7aa8ff;
+  --color-disabled: #3a3a3f;
+
+  --color-success: #3ecf8e;
+  --color-warning: #f0b757;
+  --color-danger: #ff5f57;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --radius-menu: 24px;
+  --radius-modal: 28px;
+  --radius-card: 20px;
+
+  --font-family: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Desktop shell geometry. The sidebar is one number everywhere. */
+  --sidebar-w: 264px;
+  --sidebar-w-collapsed: 68px;
+  --thread-w: 840px; /* outer box; 40px of gutter leaves a 760px column */
+
+  /* Motion: one curve, one duration scale. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.3, 0.64, 1);
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 260ms;
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-control: var(--color-control);
+  --color-surface: var(--color-surface);
+  --color-raised: var(--color-surface-raised);
+  --color-hairline: var(--color-border);
+  --color-hairline-strong: var(--color-border-strong);
+  --color-ink: var(--color-text-primary);
+  --color-sub: var(--color-text-secondary);
+  --color-muted: var(--color-text-muted);
+  --color-accent: var(--color-accent);
+  --color-accent-soft: var(--color-accent-soft);
+  --color-accent-text: var(--color-accent-text);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-danger: var(--color-danger);
+  --color-disabled: var(--color-disabled);
+
+  --font-sans: var(--font-family);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+
+  --radius-menu: var(--radius-menu);
+  --radius-modal: var(--radius-modal);
+  --radius-card: var(--radius-card);
+}
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    background: var(--color-bg);
+    height: 100%;
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-text-primary);
+    font-family: var(--font-family);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv05" 1, "cv08" 1, "calt" 1;
+    letter-spacing: -0.006em;
+    min-height: 100%;
+    overscroll-behavior-y: none;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  code,
+  pre,
+  kbd {
+    font-family: var(--font-mono);
+    font-feature-settings: "calt" 0;
+    letter-spacing: 0;
+  }
+
+  [data-dragging="true"] {
+    cursor: grabbing;
+  }
+
+  ::selection {
+    background: rgba(59, 130, 246, 0.32);
+    color: #fff;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+
+  button,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+
+  textarea::placeholder,
+  input::placeholder {
+    color: var(--color-text-muted);
+    opacity: 1;
+  }
+}
+
+@layer utilities {
+  .scroll-quiet {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+  .scroll-quiet::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-quiet::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .scroll-quiet::-webkit-scrollbar-thumb:hover {
+    background: var(--color-border-strong);
+    background-clip: content-box;
+  }
+  .scroll-quiet::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /*
+   * Floating layers. The identity is flat: no gradients anywhere, no blur
+   * except where a surface genuinely floats over moving content (the attach
+   * menu over the thread). Shadows exist only on menus and modals.
+   */
+  .float-menu {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+
+  .float-modal {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  }
+
+  .float-panel {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
+  }
+
+  /* The app's one interactive surface recipe. */
+  .surface {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    transition:
+      background-color var(--dur-fast) ease,
+      border-color var(--dur-fast) ease,
+      color var(--dur-fast) ease;
+  }
+
+  .surface-hover:hover {
+    background: var(--color-surface-raised);
+    border-color: var(--color-border-strong);
+  }
+
+  .lift {
+    transition:
+      transform var(--dur-base) var(--ease-out),
+      border-color var(--dur-base) var(--ease-out),
+      background-color var(--dur-base) var(--ease-out);
+  }
+
+  .lift:hover {
+    transform: translateY(-1px);
+    border-color: var(--color-border-strong);
+  }
+
+  /* Loading placeholders: a flat block with a slow sheen, never a spinner. */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--color-surface);
+    border-radius: 8px;
+  }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.045),
+      transparent
+    );
+    animation: grace-sheen 1.6s ease-in-out infinite;
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Motion. One fade-up, one sheet, one modal. Reduced motion keeps a   */
+/* fade and drops everything that moves.                               */
+/* ------------------------------------------------------------------ */
+@keyframes grace-sheen {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes grace-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes grace-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes grace-sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes grace-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes grace-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-fade-up {
+  animation: grace-fade-up 300ms var(--ease-out) both;
+}
+.animate-fade-in {
+  animation: grace-fade-in 160ms ease-out both;
+}
+.animate-sheet-up {
+  animation: grace-sheet-up 200ms var(--ease-out) both;
+}
+.animate-modal-in {
+  animation: grace-modal-in 200ms var(--ease-out) both;
+}
+.animate-pulse-soft {
+  animation: grace-pulse 1.6s ease-in-out infinite;
+}
+
+.stagger > * {
+  animation: grace-fade-up 240ms var(--ease-out) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 18ms; }
+.stagger > *:nth-child(3) { animation-delay: 36ms; }
+.stagger > *:nth-child(4) { animation-delay: 54ms; }
+.stagger > *:nth-child(5) { animation-delay: 72ms; }
+.stagger > *:nth-child(6) { animation-delay: 90ms; }
+.stagger > *:nth-child(7) { animation-delay: 108ms; }
+.stagger > *:nth-child(8) { animation-delay: 126ms; }
+.stagger > *:nth-child(n + 9) { animation-delay: 144ms; }
+
+.press {
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+.press:active {
+  transform: scale(0.985);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-sheet-up,
+  .animate-modal-in,
+  .stagger > * {
+    animation: grace-fade-in 1ms linear both;
+  }
+  .animate-pulse-soft {
+    animation: none;
+  }
+  .press:active {
+    transform: none;
+  }
+  * {
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* ==========================================================================
+ * The paper theme.
+ *
+ * The chat is black; the public page is paper. Rather than fork a second
+ * stylesheet, the marketing surface is wrapped in `[data-theme="paper"]` and
+ * every token in the ladder is re-pointed at the light values measured from
+ * the reference page. Anything that draws itself with the app's tokens
+ * therefore turns light inside that wrapper and stays dark everywhere else —
+ * including menus, borders and scrollbars, because they all read the same
+ * variables.
+ *
+ * Values are the measured reference tokens, not eyeballed equivalents:
+ *   surface    #FCFAF8 (warm off-white, never pure white)
+ *   raised     #FFFFFF
+ *   sunken     #F0EBE5
+ *   control    #F5F1EC
+ *   text       #2E2B29 / #67625B / #8B867E
+ *   border     #EEEDEC / #E3DED8 / #DAD3CB
+ *   ink cta    #252523
+ *   highlight  #F4C406
+ * ========================================================================== */
+[data-theme="paper"] {
+  --color-bg: #fcfaf8;
+  --color-control: #f5f1ec;
+  --color-surface: #ffffff;
+  --color-surface-raised: #f0ebe5;
+  --color-border: #eeedec;
+  --color-border-strong: #dad3cb;
+
+  --color-text-primary: #2e2b29;
+  --color-text-secondary: #67625b;
+  --color-text-muted: #8b867e;
+
+  /* The accent is a warm ink, not a blue: the reference's only saturated
+     colour is the highlighter yellow behind one word, and blue would read as
+     a different product. */
+  --color-accent: #252523;
+  --color-accent-soft: #f0ebe5;
+  --color-accent-text: #4a453f;
+  --color-disabled: #ddd7d0;
+
+  --color-success: #2f7d5d;
+  --color-warning: #8a6106;
+  --color-danger: #b4372c;
+
+  --font-family: "Instrument Sans", "Inter Variable", system-ui, sans-serif;
+  --font-display: "Instrument Serif", ui-serif, Georgia, Cambria, "Times New Roman", serif;
+
+  color-scheme: light;
+}
+
+[data-theme="paper"] ::selection {
+  background: #f4c406;
+  color: #2e2b29;
+}
+
+[data-theme="paper"] :focus-visible {
+  outline-color: #252523;
+}
+
+/* The measured type scale from the reference stylesheet. `.header-5xl` is the
+   one big line on the page: 48px serif at weight 300, leading 1, and the same
+   tight -0.025em tracking the reference uses. */
+.paper-header {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.025em;
+  color: #67625b;
+}
+
+@media (min-width: 640px) {
+  .paper-header {
+    font-size: 3.5rem;
+  }
+}
+
+/* The highlighter: an inline block of pure yellow behind an italic word, with
+   the text inside the block turning near-black. Padding is horizontal only so
+   the block hugs the line box exactly as the reference does. */
+.paper-highlight {
+  display: inline-block;
+  background: #f4c406;
+  color: #252523;
+  padding-inline: 0.5rem;
+  line-height: 1;
+  font-style: italic;
+}
+
+.paper-rule {
+  border-color: #eeedec;
+}
+
+/* One soft lift, used by cards that can be clicked. The reference's own card
+   shadow is a nearly invisible 5px grey halo, so nothing here is heavy. */
+.paper-lift {
+  transition:
+    background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.paper-lift:hover {
+  background: #f5f1ec;
+  border-color: #dad3cb;
+}
+.paper-lift:active {
+  transform: translateY(0.5px);
+}
+
+/* The page's own entrance: one soft rise, staggered by the caller. */
+@keyframes paper-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.paper-rise {
+  animation: paper-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paper-rise,
+  .paper-lift {
+    animation: none;
+    transition: none;
+  }
+}
